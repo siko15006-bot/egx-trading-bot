@@ -322,7 +322,9 @@ def main() -> int:
         with log_path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 
-    data_map = {t: eng.with_dividends(t, d) for t, d in eng.load_data_map(HERE / "data").items()}
+    mode, line = eng.resolve_dividend_mode(HERE / "data")
+    log(f"[DATA] {line}")
+    data_map = {t: eng.with_dividends(t, d) if mode == "add" else d for t, d in eng.load_data_map(HERE / "data").items()}
     log(f"[DATA] main: {len(data_map)} tickers {sorted(data_map)}")
     capital = eng.RiskConfig().capital
 
@@ -358,7 +360,9 @@ def main() -> int:
     main_runs, main_bh = run_suite(data_map, scenarios, None, log, "main")
 
     # 3) السوق الهابط: 2022–2023 (تسخين من 2021) + نافذة الهبوط الفعلية يناير→يوليو 2022
-    bear_map = eng.load_data_map(BEAR_DIR)   # fully adjusted already (auto_adjust=True) — no with_dividends, or dividends count twice
+    mode, line = eng.resolve_dividend_mode(BEAR_DIR)
+    log(f"[DATA] {line}")
+    bear_map = {t: eng.with_dividends(t, d) if mode == "add" else d for t, d in eng.load_data_map(BEAR_DIR).items()}
     log(f"[DATA] bear: {len(bear_map)} tickers from {BEAR_DIR.name}/")
     full_runs, full_bh = run_suite(bear_map, scenarios, BEAR_START, log, "2022-23")
     cut = pd.Timestamp(BEAR_TROUGH, tz="UTC") + pd.Timedelta(days=1)

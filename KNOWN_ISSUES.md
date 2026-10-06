@@ -82,7 +82,10 @@ Known real sessions among `unexplained`: 2026-06-22, 2026-08-10. Whole week 2025
   (Yahoo `Ticker.actions`, full history, gross per share, split-adjusted like `data/`).
 - **Only for dividend-unadjusted prices (`data/`).** `data_2019_2026_wf/`, `data_2022_2023/` (verified = `wf`)
   and `data_dividend_adjusted/` already contain dividends — calling `with_dividends` on them counts them twice.
-  The optimizer's 2022-23 runs therefore stay without it. Same caution for the dashboard folder picker / CLI path.
+  Enforced since `fix/data-folder-safety`: `KNOWN_ADJUSTED_FOLDERS` / `KNOWN_UNADJUSTED_FOLDERS` in
+  `egx_4_mirrors_v3.py` + `resolve_dividend_mode()`. Known folder with the wrong mode → error; unknown folder
+  (other paths, uploads, demo) → `--dividend-mode add|none` (CLI) or the dashboard radio is required.
+  Every backtest prints `Data folder: ... Dividend mode: ...`. `data_2020_2021` verified = `wf` (COMI/EAST).
 - SL/TP are computed from `data/` prices (not dividend-adjusted). This matches most brokers, but a trade that exits
   on an ex-date exits at the lower unadjusted price and then receives the dividend in PnL. In the 2026-10-06 sample,
   5 of 346 trades exited by SL/TRAIL_SL on the ex-date itself (ARCC, BINV, EFID, ETRS, SAUD). The final PnL is right;
