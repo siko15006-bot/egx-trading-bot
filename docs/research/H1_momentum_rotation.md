@@ -73,6 +73,14 @@ Criteria: 1 FAIL (Sharpe diff −0.51), 2 FAIL, 3 PASS, 4 FAIL. All four info-on
 also lose to the equal-weight benchmark in both periods, so the failure is not a parameter accident.
 Per the rules above, H1 is closed; no re-run with other parameters.
 
+Scope of this result:
+- Only cross-sectional momentum (rank and hold the top N) was tested; the 4 variants are sensitivity checks of the
+  same family. Time-series momentum, trend-filtered, volume-confirmed and risk-adjusted momentum were not tested and
+  are outside H1.
+- The winner is an equal-weight portfolio of the 60 most liquid names, rebalanced every 21 days **after the same
+  fees** (0.15% per side on turnover); taxes and slippage are excluded for both. It is not the cap-weighted market:
+  EGX30 / value-weighted comparison was not tested, and 2023-2026 is one ~4-year window.
+
 ## Edit log
 
 - 2026-10-06: created.
