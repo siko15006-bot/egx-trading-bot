@@ -328,7 +328,7 @@ def render_tab1() -> None:
         summary,
         width="stretch",
         hide_index=True,
-        column_config={"Avg Value 20": st.column_config.NumberColumn(format="%.0f")},
+        column_config={"Avg Value 20": st.column_config.NumberColumn(format="compact")},
     )
 
 
@@ -708,7 +708,7 @@ def render_tab5(screen_cfg: ScreenConfig, signal_cfg: SignalConfig, risk_cfg: Ri
     bubble = go.Figure(go.Scatter(x=summary["Sector"], y=summary["Win Rate"], mode="markers+text", text=summary["Trades"], textposition="middle center", marker=dict(size=bubble_size, color=summary["Avg R"], colorscale="RdYlGn", showscale=True, colorbar_title="Avg R")))
     bubble.update_layout(title="Sector Win Rate and Trade Count", yaxis_title="Win Rate %", height=400, margin=dict(l=20, r=20, t=55, b=20))
     st.plotly_chart(bubble, width="stretch")
-    st.dataframe(summary, width="stretch", hide_index=True, column_config={"Win Rate": st.column_config.NumberColumn(format="%.1f%%"), "Total PnL": st.column_config.NumberColumn(format="%.0f")})
+    st.dataframe(summary, width="stretch", hide_index=True, column_config={"Win Rate": st.column_config.NumberColumn(format="%.1f%%"), "Total PnL": st.column_config.NumberColumn(format="localized")})
 
     best = summary.loc[summary["Avg R"].idxmax()]
     worst = summary.loc[summary["Avg R"].idxmin()]
