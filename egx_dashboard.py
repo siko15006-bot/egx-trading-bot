@@ -402,9 +402,9 @@ def render_tab2(screen_cfg: ScreenConfig, signal_cfg: SignalConfig, risk_cfg: Ri
         hide_index=True,
         column_config={
             "Mirrors Score": st.column_config.ProgressColumn(min_value=0, max_value=4, format="%d / 4"),
-            "Entry": st.column_config.NumberColumn(format="%.3f EGP"),
-            "SL": st.column_config.NumberColumn(format="%.3f EGP"),
-            "TP": st.column_config.NumberColumn(format="%.3f EGP"),
+            "Entry": st.column_config.NumberColumn(format="%.2f"),
+            "SL": st.column_config.NumberColumn(format="%.2f"),
+            "TP": st.column_config.NumberColumn(format="%.2f"),
             "ATR%": st.column_config.NumberColumn(format="%.2f%%"),
         },
     )
