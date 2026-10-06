@@ -1,0 +1,642 @@
+{
+  "run_at": "2026-10-06T22:08:57",
+  "yfinance": "1.2.0",
+  "settings": {
+    "period": "2y",
+    "interval": "1d",
+    "auto_adjust": true,
+    "actions": true
+  },
+  "files": {
+    "ABUK.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 0
+    },
+    "ACGC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 1
+    },
+    "ADIB.CA": {
+      "rows": 492,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 1
+    },
+    "AFMC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "AJWA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "ALCN.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 0
+    },
+    "AMES.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "AMIA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "AMOC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 0
+    },
+    "ARCC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 0
+    },
+    "ASCM.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "ATLC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "ATQA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "BINV.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "CANA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 2
+    },
+    "CCAP.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "CEFM.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "CIEB.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "CIRA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "CLHO.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "COMI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "CSAG.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "DAPH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "EAST.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 0
+    },
+    "ECAP.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "EFIC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "EFID.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 2
+    },
+    "EFIH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 4,
+      "splits": 1
+    },
+    "EGAL.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "EGAS.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "EGCH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "EGTS.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "ELSH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 3,
+      "splits": 0
+    },
+    "EMFD.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "ENGC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "ETEL.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "ETRS.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "EXPA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 1
+    },
+    "FERC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "FWRY.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "GBCO.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "HDBK.CA": {
+      "rows": 492,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "HELI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "HRHO.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "ICFC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 1
+    },
+    "IFAP.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 1
+    },
+    "INFI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 2
+    },
+    "IRON.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "ISMA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "ISMQ.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "ISPH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "JUFO.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 2
+    },
+    "KABO.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "LCSW.CA": {
+      "rows": 492,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "MAAL.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "MASR.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "MBSC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "MCQE.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "MENA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "MFPC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "MPCI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "MPRC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "MTIE.CA": {
+      "rows": 492,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 2
+    },
+    "NCCW.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 2
+    },
+    "NIPH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "OBRI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "OCDI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "OLFI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "ORHD.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "ORWE.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "PHAR.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "PHDC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "PRCL.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "PRDC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "RACC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "RAYA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "RMDA.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    },
+    "SAUD.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "SCEM.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "SCFM.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "SDTI.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "SKPC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 2
+    },
+    "SNFC.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "SPIN.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 1
+    },
+    "SUGR.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "SVCE.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 0,
+      "splits": 0
+    },
+    "SWDY.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "TMGH.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 0
+    },
+    "ZEOT.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 1,
+      "splits": 0
+    },
+    "ZMID.CA": {
+      "rows": 491,
+      "first": "2024-10-07",
+      "last": "2026-10-05",
+      "dividends": 2,
+      "splits": 1
+    }
+  }
+}

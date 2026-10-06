@@ -57,10 +57,6 @@ def _shares(entry: float, stop: float, last: pd.Series, risk: eng.RiskConfig) ->
                    floor(risk.max_avg_volume_pct * float(last["Volume_SMA20"]))))
 
 
-def _net_pnl(entry: float, exit_price: float, shares: int, risk: eng.RiskConfig) -> float:
-    """صافي الربح بعد العمولة (على الدخول والخروج) وضريبة 10% على الربح — نفس المحرك."""
-    pre_tax = (exit_price - entry) * shares - risk.round_trip_fee_pct * shares * (entry + exit_price)
-    return pre_tax - max(pre_tax, 0) * risk.capital_gains_tax_pct
 
 
 def _start(data: pd.DataFrame, start_date: Optional[str]) -> int:
@@ -164,7 +160,7 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
                 break
         if mode == "realistic" and reason != "END":
             assert exit_index > i, "look-ahead: exit on the entry bar"
-        pnl = _net_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk)
+        pnl = eng.net_trade_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk, eng.dividends_between(data, i, exit_index))
         equity += pnl
         daily_pnl.iloc[exit_index] += pnl
         exposure.iloc[i: exit_index + 1] += plan["position_value"] / capital
@@ -175,7 +171,7 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
         i = max(exit_index + 1, i + 1)
     span = data.index[start:]
     equity_curve = capital + daily_pnl.loc[span].cumsum()
-    bh_curve = capital * data["Close"].loc[span] / float(data["Close"].iloc[start])
+    bh_curve = eng.buy_hold_curve(data, start, capital, sc.risk)
     return {"trades": pd.DataFrame(trades), "equity": equity_curve, "bh": bh_curve, "final": equity,
             "exposure": exposure.loc[span]}
 
@@ -201,7 +197,9 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
     def close_position(t: str, ts: pd.Timestamp, px: float, why: str) -> None:
         nonlocal cash
         p = pos.pop(t)
-        pnl = _net_pnl(p["entry"], px, p["shares"], risk)
+        d = ind[t]
+        pnl = eng.net_trade_pnl(p["entry"], px, p["shares"], risk,
+                                eng.dividends_between(d, d.index.get_loc(p["ts"]), d.index.get_loc(ts)))
         cash += p["shares"] * p["entry"] * (1 + fee / 2) + pnl   # يرجّع التكلفة المدفوعة + صافي الربح
         value = p["shares"] * p["entry"]
         trades.append({"ticker": t, "entry_date": p["ts"], "exit_date": ts, "entry": p["entry"], "exit": px, "shares": p["shares"],
@@ -324,7 +322,7 @@ def main() -> int:
         with log_path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 
-    data_map = eng.load_data_map(HERE / "data")
+    data_map = {t: eng.with_dividends(t, d) for t, d in eng.load_data_map(HERE / "data").items()}
     log(f"[DATA] main: {len(data_map)} tickers {sorted(data_map)}")
     capital = eng.RiskConfig().capital
 
@@ -360,7 +358,7 @@ def main() -> int:
     main_runs, main_bh = run_suite(data_map, scenarios, None, log, "main")
 
     # 3) السوق الهابط: 2022–2023 (تسخين من 2021) + نافذة الهبوط الفعلية يناير→يوليو 2022
-    bear_map = eng.load_data_map(BEAR_DIR)
+    bear_map = eng.load_data_map(BEAR_DIR)   # fully adjusted already (auto_adjust=True) — no with_dividends, or dividends count twice
     log(f"[DATA] bear: {len(bear_map)} tickers from {BEAR_DIR.name}/")
     full_runs, full_bh = run_suite(bear_map, scenarios, BEAR_START, log, "2022-23")
     cut = pd.Timestamp(BEAR_TROUGH, tz="UTC") + pd.Timedelta(days=1)
@@ -386,7 +384,7 @@ def main() -> int:
 
 
 def _raw(data_map: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    return {t: d[["Open", "High", "Low", "Close", "Volume"]] for t, d in data_map.items()}
+    return {t: d[[c for c in ("Open", "High", "Low", "Close", "Volume", "Dividends") if c in d.columns]] for t, d in data_map.items()}
 
 
 def _recommend(best: str, main_runs: dict, main_bh: dict, bear_runs: dict, bear_bh: dict) -> str:

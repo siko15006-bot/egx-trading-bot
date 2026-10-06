@@ -1,0 +1,191 @@
+date,dow,type,source
+2019-07-23,Tue,holiday,python-holidays Egypt: July 23 Revolution Day
+2019-08-11,Sun,holiday,python-holidays Egypt: Eid al-Adha (estimated)
+2019-08-12,Mon,holiday,python-holidays Egypt: Eid al-Adha (estimated)
+2019-08-13,Tue,holiday,python-holidays Egypt: Eid al-Adha (estimated)
+2019-09-01,Sun,uncertain_near_holiday,1d from Islamic New Year (estimated)
+2019-10-06,Sun,holiday,python-holidays Egypt: Armed Forces Day
+2019-11-10,Sun,uncertain_near_holiday,1d from Prophet's Birthday (estimated)
+2019-12-12,Thu,unexplained,
+2020-01-01,Wed,unexplained,
+2020-01-07,Tue,holiday,python-holidays Egypt: Coptic Christmas Day
+2020-01-29,Wed,unexplained,
+2020-02-04,Tue,unexplained,
+2020-02-06,Thu,unexplained,
+2020-02-24,Mon,unexplained,
+2020-02-26,Wed,unexplained,
+2020-03-03,Tue,unexplained,
+2020-03-12,Thu,unexplained,
+2020-04-19,Sun,uncertain_near_holiday,1d from Spring Festival
+2020-04-20,Mon,holiday,python-holidays Egypt: Spring Festival
+2020-05-24,Sun,holiday,python-holidays Egypt: Eid al-Fitr
+2020-05-25,Mon,holiday,python-holidays Egypt: Eid al-Fitr
+2020-05-26,Tue,uncertain_near_holiday,1d from Eid al-Fitr
+2020-05-27,Wed,uncertain_near_holiday,2d from Eid al-Fitr
+2020-05-28,Thu,uncertain_near_holiday,3d from Eid al-Fitr
+2020-07-01,Wed,uncertain_near_holiday,1d from June 30 Revolution Day (observed)
+2020-07-02,Thu,holiday,python-holidays Egypt: June 30 Revolution Day (observed)
+2020-07-23,Thu,holiday,python-holidays Egypt: July 23 Revolution Day
+2020-07-30,Thu,holiday,python-holidays Egypt: Day of Arafah
+2020-08-02,Sun,holiday,python-holidays Egypt: Eid al-Adha
+2020-08-03,Mon,uncertain_near_holiday,1d from Eid al-Adha
+2020-08-20,Thu,holiday,python-holidays Egypt: Islamic New Year
+2020-09-09,Wed,unexplained,
+2020-10-06,Tue,uncertain_near_holiday,2d from Armed Forces Day (observed)
+2020-10-08,Thu,holiday,python-holidays Egypt: Armed Forces Day (observed)
+2020-10-29,Thu,holiday,python-holidays Egypt: Prophet's Birthday
+2021-01-07,Thu,holiday,python-holidays Egypt: Coptic Christmas Day
+2021-01-25,Mon,uncertain_near_holiday,3d from January 25th Revolution and National Police Day (observed)
+2021-01-28,Thu,holiday,python-holidays Egypt: January 25th Revolution and National Police Day (observed)
+2021-03-04,Thu,unexplained,
+2021-04-29,Thu,holiday,python-holidays Egypt: Sinai Liberation Day (observed)
+2021-05-02,Sun,uncertain_near_holiday,1d from Labor Day
+2021-05-03,Mon,holiday,python-holidays Egypt: Spring Festival
+2021-05-12,Wed,uncertain_near_holiday,1d from Eid al-Fitr
+2021-05-13,Thu,holiday,python-holidays Egypt: Eid al-Fitr
+2021-05-16,Sun,uncertain_near_holiday,2d from Eid al-Fitr
+2021-07-01,Thu,holiday,python-holidays Egypt: June 30 Revolution Day (observed)
+2021-07-19,Mon,holiday,python-holidays Egypt: Day of Arafah
+2021-07-20,Tue,holiday,python-holidays Egypt: Eid al-Adha
+2021-07-21,Wed,holiday,python-holidays Egypt: Eid al-Adha
+2021-07-22,Thu,holiday,python-holidays Egypt: Eid al-Adha
+2021-08-08,Sun,unexplained,
+2021-08-09,Mon,uncertain_near_holiday,3d from Islamic New Year (observed)
+2021-08-12,Thu,holiday,python-holidays Egypt: Islamic New Year (observed)
+2021-09-21,Tue,unexplained,
+2021-09-29,Wed,unexplained,
+2021-10-04,Mon,uncertain_near_holiday,3d from Armed Forces Day (observed)
+2021-10-07,Thu,holiday,python-holidays Egypt: Armed Forces Day (observed)
+2021-10-18,Mon,holiday,python-holidays Egypt: Prophet's Birthday
+2021-10-21,Thu,uncertain_near_holiday,3d from Prophet's Birthday
+2021-11-07,Sun,unexplained,
+2021-11-08,Mon,unexplained,
+2021-11-09,Tue,unexplained,
+2021-11-28,Sun,unexplained,
+2021-11-30,Tue,unexplained,
+2021-12-01,Wed,unexplained,
+2021-12-14,Tue,unexplained,
+2022-01-06,Thu,holiday,python-holidays Egypt: Coptic Christmas Day (observed)
+2022-01-09,Sun,uncertain_near_holiday,3d from Coptic Christmas Day (observed)
+2022-01-27,Thu,holiday,python-holidays Egypt: January 25th Revolution and National Police Day (observed)
+2022-03-08,Tue,unexplained,
+2022-04-24,Sun,uncertain_near_holiday,1d from Sinai Liberation Day; Spring Festival
+2022-04-25,Mon,holiday,python-holidays Egypt: Sinai Liberation Day; Spring Festival
+2022-05-01,Sun,holiday,python-holidays Egypt: Eid al-Fitr
+2022-05-02,Mon,holiday,python-holidays Egypt: Eid al-Fitr
+2022-05-03,Tue,uncertain_near_holiday,1d from Eid al-Fitr
+2022-05-04,Wed,holiday,python-holidays Egypt: Eid al-Fitr (observed)
+2022-05-05,Thu,holiday,python-holidays Egypt: Labor Day (observed)
+2022-06-05,Sun,unexplained,
+2022-06-30,Thu,holiday,python-holidays Egypt: June 30 Revolution Day
+2022-07-10,Sun,holiday,python-holidays Egypt: Eid al-Adha
+2022-07-11,Mon,holiday,python-holidays Egypt: Eid al-Adha
+2022-07-12,Tue,holiday,python-holidays Egypt: Eid al-Adha
+2022-07-13,Wed,holiday,python-holidays Egypt: Eid al-Adha
+2022-07-14,Thu,holiday,python-holidays Egypt: Eid al-Adha
+2022-08-18,Thu,unexplained,
+2022-08-23,Tue,unexplained,
+2022-10-06,Thu,holiday,python-holidays Egypt: Armed Forces Day
+2022-10-26,Wed,unexplained,
+2023-01-01,Sun,unexplained,
+2023-01-08,Sun,holiday,python-holidays Egypt: Coptic Christmas Day (observed)
+2023-01-26,Thu,holiday,python-holidays Egypt: January 25th Revolution and National Police Day (observed)
+2023-04-16,Sun,uncertain_near_holiday,1d from Spring Festival
+2023-04-17,Mon,holiday,python-holidays Egypt: Spring Festival
+2023-04-20,Thu,uncertain_near_holiday,1d from Eid al-Fitr
+2023-04-23,Sun,uncertain_near_holiday,1d from Eid al-Fitr
+2023-04-24,Mon,holiday,python-holidays Egypt: Eid al-Fitr (observed)
+2023-04-25,Tue,uncertain_near_holiday,1d from Eid al-Fitr (observed)
+2023-05-01,Mon,uncertain_near_holiday,3d from Labor Day (observed)
+2023-05-04,Thu,holiday,python-holidays Egypt: Labor Day (observed)
+2023-06-27,Tue,holiday,python-holidays Egypt: Day of Arafah
+2023-06-28,Wed,holiday,python-holidays Egypt: Eid al-Adha
+2023-06-29,Thu,holiday,python-holidays Egypt: Eid al-Adha
+2023-07-02,Sun,holiday,python-holidays Egypt: June 30 Revolution Day (observed)
+2023-07-03,Mon,holiday,python-holidays Egypt: Eid al-Adha (observed)
+2023-07-19,Wed,uncertain_near_holiday,1d from Islamic New Year (observed)
+2023-07-20,Thu,holiday,python-holidays Egypt: Islamic New Year (observed)
+2023-07-23,Sun,holiday,python-holidays Egypt: July 23 Revolution Day
+2023-08-31,Thu,unexplained,
+2023-09-10,Sun,unexplained,
+2023-09-20,Wed,unexplained,
+2023-09-21,Thu,unexplained,
+2023-09-24,Sun,unexplained,
+2023-09-27,Wed,uncertain_near_holiday,1d from Prophet's Birthday
+2023-09-28,Thu,holiday,python-holidays Egypt: Prophet's Birthday
+2023-10-01,Sun,uncertain_near_holiday,3d from Prophet's Birthday
+2023-10-05,Thu,uncertain_near_holiday,1d from Armed Forces Day
+2023-10-19,Thu,unexplained,
+2023-12-24,Sun,unexplained,
+2024-01-01,Mon,unexplained,
+2024-01-07,Sun,holiday,python-holidays Egypt: Coptic Christmas Day
+2024-01-25,Thu,holiday,python-holidays Egypt: January 25th Revolution and National Police Day
+2024-02-18,Sun,unexplained,
+2024-04-09,Tue,uncertain_near_holiday,1d from Eid al-Fitr
+2024-04-10,Wed,holiday,python-holidays Egypt: Eid al-Fitr
+2024-04-11,Thu,holiday,python-holidays Egypt: Eid al-Fitr
+2024-04-14,Sun,uncertain_near_holiday,3d from Eid al-Fitr
+2024-04-25,Thu,holiday,python-holidays Egypt: Sinai Liberation Day
+2024-04-28,Sun,uncertain_near_holiday,3d from Sinai Liberation Day
+2024-05-01,Wed,unexplained,
+2024-05-05,Sun,holiday,python-holidays Egypt: Labor Day (observed)
+2024-05-06,Mon,holiday,python-holidays Egypt: Spring Festival
+2024-05-26,Sun,unexplained,
+2024-06-16,Sun,holiday,python-holidays Egypt: Eid al-Adha
+2024-06-17,Mon,holiday,python-holidays Egypt: Eid al-Adha
+2024-06-18,Tue,holiday,python-holidays Egypt: Eid al-Adha
+2024-06-19,Wed,uncertain_near_holiday,1d from Eid al-Adha
+2024-06-20,Thu,uncertain_near_holiday,2d from Eid al-Adha
+2024-06-30,Sun,holiday,python-holidays Egypt: June 30 Revolution Day
+2024-07-01,Mon,uncertain_near_holiday,1d from June 30 Revolution Day
+2024-07-11,Thu,holiday,python-holidays Egypt: Islamic New Year (observed)
+2024-07-25,Thu,holiday,python-holidays Egypt: July 23 Revolution Day (observed)
+2024-09-15,Sun,holiday,python-holidays Egypt: Prophet's Birthday
+2024-10-06,Sun,holiday,python-holidays Egypt: Armed Forces Day
+2025-01-01,Wed,unexplained,
+2025-01-07,Tue,holiday,python-holidays Egypt: Coptic Christmas Day
+2025-03-30,Sun,holiday,python-holidays Egypt: Eid al-Fitr
+2025-03-31,Mon,holiday,python-holidays Egypt: Eid al-Fitr
+2025-04-01,Tue,uncertain_near_holiday,1d from Eid al-Fitr
+2025-04-02,Wed,uncertain_near_holiday,2d from Eid al-Fitr
+2025-04-20,Sun,uncertain_near_holiday,1d from Spring Festival
+2025-04-21,Mon,holiday,python-holidays Egypt: Spring Festival
+2025-04-24,Thu,uncertain_near_holiday,1d from Sinai Liberation Day
+2025-05-01,Thu,holiday,python-holidays Egypt: Labor Day
+2025-06-05,Thu,holiday,python-holidays Egypt: Day of Arafah
+2025-06-08,Sun,holiday,python-holidays Egypt: Eid al-Adha
+2025-06-09,Mon,uncertain_near_holiday,1d from Eid al-Adha
+2025-06-26,Thu,holiday,python-holidays Egypt: Islamic New Year
+2025-07-03,Thu,holiday,python-holidays Egypt: June 30 Revolution Day (observed)
+2025-07-08,Tue,unexplained,
+2025-07-23,Wed,uncertain_near_holiday,1d from July 23 Revolution Day (observed)
+2025-07-24,Thu,holiday,python-holidays Egypt: July 23 Revolution Day (observed)
+2025-08-03,Sun,unexplained,
+2025-08-04,Mon,unexplained,
+2025-08-05,Tue,unexplained,
+2025-08-06,Wed,unexplained,
+2025-08-07,Thu,unexplained,
+2025-09-04,Thu,holiday,python-holidays Egypt: Prophet's Birthday
+2025-10-09,Thu,holiday,python-holidays Egypt: Armed Forces Day (observed)
+2026-01-01,Thu,unexplained,
+2026-01-07,Wed,holiday,python-holidays Egypt: Coptic Christmas Day
+2026-01-29,Thu,holiday,python-holidays Egypt: January 25th Revolution and National Police Day (observed)
+2026-03-19,Thu,uncertain_near_holiday,1d from Eid al-Fitr
+2026-03-22,Sun,uncertain_near_holiday,1d from Eid al-Fitr
+2026-03-23,Mon,uncertain_near_holiday,2d from Eid al-Fitr
+2026-04-12,Sun,uncertain_near_holiday,1d from Spring Festival
+2026-04-13,Mon,holiday,python-holidays Egypt: Spring Festival
+2026-05-07,Thu,unexplained,
+2026-05-26,Tue,holiday,python-holidays Egypt: Day of Arafah (estimated)
+2026-05-27,Wed,holiday,python-holidays Egypt: Eid al-Adha (estimated)
+2026-05-28,Thu,holiday,python-holidays Egypt: Eid al-Adha (estimated)
+2026-05-31,Sun,uncertain_near_holiday,2d from Eid al-Adha (estimated)
+2026-06-17,Wed,uncertain_near_holiday,"1d from Islamic New Year (observed, estimated)"
+2026-06-18,Thu,holiday,"python-holidays Egypt: Islamic New Year (observed, estimated)"
+2026-06-22,Mon,unexplained,
+2026-07-02,Thu,holiday,python-holidays Egypt: June 30 Revolution Day (observed)
+2026-07-23,Thu,holiday,python-holidays Egypt: July 23 Revolution Day
+2026-08-09,Sun,unexplained,
+2026-08-10,Mon,unexplained,
+2026-08-16,Sun,unexplained,
+2026-08-27,Thu,uncertain_near_holiday,2d from Prophet's Birthday (estimated)

@@ -92,6 +92,7 @@ class RiskConfig:
     reward_risk: float = 2.0
     round_trip_fee_pct: float = 0.003
     capital_gains_tax_pct: float = 0.10
+    dividend_tax_pct: float = 0.10  # withheld at source on cash dividends, separate from capital gains tax
     max_position_pct: float = 0.20
     max_avg_volume_pct: float = 0.01
 
@@ -381,6 +382,45 @@ def limit_sector_exposure(
     return kept
 
 
+ACTIONS_CSV = Path(__file__).with_name("docs") / "corporate_actions.csv"
+
+
+# يضيف عمود Dividends (توزيع/سهم، قبل الضريبة) على تاريخ الاستحقاق — للـbacktest فقط، الإنتاج مش محتاجه.
+def with_dividends(ticker: str, df: pd.DataFrame, actions_csv: Path = ACTIONS_CSV) -> pd.DataFrame:
+    data = df.copy()
+    data["Dividends"] = 0.0
+    if not actions_csv.exists() or data.empty:
+        return data
+    acts = pd.read_csv(actions_csv)
+    acts = acts[(acts["ticker"].str.upper() == ticker.upper()) & (acts["dividend"] != 0)]
+    days = data.index.tz_convert(CAIRO_TZ).tz_localize(None).normalize() if data.index.tz else data.index.normalize()
+    for ex_date, amount in zip(pd.to_datetime(acts["ex_date"]), acts["dividend"]):
+        pos = days.searchsorted(ex_date)  # ex-date missing from the data (Yahoo gap) → next available bar
+        if 0 < pos < len(data):
+            data.iloc[pos, data.columns.get_loc("Dividends")] += float(amount)
+    return data
+
+
+# توزيعات/سهم بتاريخ استحقاق في الشموع (i, j]: ماسك السهم في إغلاق i ولسه ماسكه قبل افتتاح يوم الاستحقاق.
+def dividends_between(data: pd.DataFrame, i: int, j: int) -> float:
+    return float(data["Dividends"].iloc[i + 1 : j + 1].sum()) if "Dividends" in data.columns else 0.0
+
+
+# صافي ربح صفقة: فرق السعر − العمولة − ضريبة الأرباح الرأسمالية + صافي التوزيعات بعد الاستقطاع.
+# مشتركة بين المحرك و backtest_optimizer عشان الاتنين يفضلوا متطابقين.
+def net_trade_pnl(entry: float, exit_price: float, shares: int, risk: RiskConfig, dividends_per_share: float = 0.0) -> float:
+    pre_tax = (exit_price - entry) * shares - risk.round_trip_fee_pct * shares * (entry + exit_price)
+    return pre_tax - max(pre_tax, 0) * risk.capital_gains_tax_pct + dividends_per_share * (1 - risk.dividend_tax_pct) * shares
+
+
+# منحنى Buy & Hold بالتوزيعات الصافية (من غير إعادة استثمار) — نفس معاملة الاستراتيجية.
+def buy_hold_curve(data: pd.DataFrame, start: int, capital: float, risk: RiskConfig) -> pd.Series:
+    close = data["Close"].iloc[start:]
+    divs = data["Dividends"].iloc[start:].copy() if "Dividends" in data.columns else pd.Series(0.0, index=close.index)
+    divs.iloc[0] = 0.0
+    return capital * (close + divs.cumsum() * (1 - risk.dividend_tax_pct)) / float(close.iloc[0])
+
+
 def _trade_return(entry: float, exit_price: float, risk_per_share: float) -> float:
     return (exit_price - entry) / risk_per_share if risk_per_share > 0 else 0.0
 
@@ -451,11 +491,8 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
                 stop_loss = max(stop_loss, entry)
 
         risk_per_share = entry - plan.stop_loss
-        gross_pnl = (float(exit_price) - entry) * plan.shares
-        fees = cfg.risk.round_trip_fee_pct * plan.shares * (entry + float(exit_price))
-        pre_tax_pnl = gross_pnl - fees
-        tax = max(pre_tax_pnl, 0) * cfg.risk.capital_gains_tax_pct
-        pnl = pre_tax_pnl - tax
+        div_ps = dividends_between(data, i, exit_index)
+        pnl = net_trade_pnl(entry, float(exit_price), plan.shares, cfg.risk, div_ps)
         r_multiple = pnl / plan.risk_egp if plan.risk_egp > 0 else _trade_return(entry, float(exit_price), risk_per_share)
         equity += pnl
         r_values.append(r_multiple)
@@ -469,6 +506,7 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
                 "Exit": float(exit_price),
                 "Shares": plan.shares,
                 "Position_Value": plan.position_value,
+                "Div_PS": div_ps,
                 "PnL_EGP": pnl,
                 "PnL_%": pnl / plan.position_value * 100,
                 "R": r_multiple,
@@ -485,7 +523,7 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
 
     total_trades = len(r_values)
     equity_series = pd.Series(dict(equity_events), dtype=float).reindex(data.index[start_index:]).ffill()
-    buy_hold_series = cfg.risk.capital * data["Close"].iloc[start_index:] / float(data["Close"].iloc[start_index])
+    buy_hold_series = buy_hold_curve(data, start_index, cfg.risk.capital, cfg.risk)
     peak_series = equity_series.cummax()
     drawdown_series = equity_series / peak_series - 1
     returns = equity_series.pct_change().dropna().to_numpy(dtype=float)
@@ -493,9 +531,7 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
     if len(returns) > 1 and returns.std(ddof=1) > 0:
         sharpe = float(returns.mean() / returns.std(ddof=1) * sqrt(252))
 
-    start_close = float(data["Close"].iloc[start_index])
-    end_close = float(data["Close"].iloc[-1])
-    buy_hold_return = (end_close / start_close) - 1 if start_close > 0 else 0.0
+    buy_hold_return = float(buy_hold_series.iloc[-1]) / cfg.risk.capital - 1
     equity_curve = pd.DataFrame(
         {
             "Strategy_Equity": equity_series,
@@ -674,7 +710,7 @@ def main() -> None:
 
     if args.backtest:
         for ticker, data in data_map.items():
-            stats = backtest(data, system_cfg)
+            stats = backtest(with_dividends(ticker, data), system_cfg)
             print(f"\nBacktest {ticker}")
             for key, value in stats.items():
                 print(f"{key}: {value}")

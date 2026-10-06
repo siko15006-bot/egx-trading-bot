@@ -14,3 +14,84 @@ Daily (midnight) rows: only the April spring-forward breaks. Hourly data: expose
 - Fix when needed: `tz_localize(CAIRO, nonexistent="shift_forward", ambiguous="NaT")` or localize dates
   as plain `date` objects instead of midnight timestamps.
 - Found 2026-10-05 while writing `test_download_freshness.py` (fixture now uses the Sun-Thu EGX week).
+
+## Yahoo filler rows (zero-volume flat bars) — provider gap, not market behaviour
+
+Rule adopted 2026-10-06. Raw CSVs stay untouched; this applies at analysis/backtest time only.
+
+- **filler** = `Volume == 0 and Open == High == Low == Close`. **real** = Volume > 0.
+  **ambiguous** = Volume 0 but OHLC not flat (handle case by case).
+- Measured on `data/` (90 files, 22,500 rows, 2025-10-05 → 2026-10-05): 1,000 filler, 0 ambiguous.
+- Fillers cover holidays (06-17/18) **and real sessions**: 06-22 (90/90), 08-09/10 (89, 88), 08-16 (89).
+  08-10 was a confirmed session (EGX30 traded, EGP 14.9bn). So filler = Yahoo calendar gap, not "no trading".
+- The 4 "Open != prev Close" days (06-21, 06-23, 08-11, 08-17 — 353 of 379 mismatches) are the first
+  real day after a filler run: prev Close is a filler value, not real.
+- Handling:
+  1. Filler rows are flagged and excluded from any OHLC-based calc; their return/PnL = NA, never 0.
+  2. The first real row after a filler gets `open_reference_unverified`: its `prev_close` = NA,
+     but its own Open stays usable.
+  3. No entries at a filler Open; no SL/TP or gap logic built on a filler prev_close.
+  4. Every performance report states the filler count and that metrics cover verifiable rows only.
+- Deferred: re-checking prices via Investing.com (doesn't change handling); alternative provider
+  (decide once filler share over 2019-2026 is measured).
+
+## Price series: `data/` and `data_2019_2026_wf/` are different series — never mix them
+
+Found 2026-10-06 on COMI, checked against Yahoo directly.
+
+| Folder | Download | Meaning | Used by |
+|---|---|---|---|
+| `data/` | `data_downloader.py`: `auto_adjust=False, actions=False` | split-adjusted, **dividend-unadjusted** | production: daily_runner, signal_engine, dashboard |
+| `data_2019_2026_wf/` | script not in repo; matches Yahoo `auto_adjust=True` | fully adjusted (splits + dividends) | analysis only: decision_analysis / decision_report |
+| `data_dividend_adjusted/` | `fetch_adjusted.py`: `auto_adjust=True, actions=True`, 2y, yfinance 1.2.0 | fully adjusted + `Dividends`/`Stock Splits` columns; companion to `data/`, **not a replacement** | returns/PnL (from 2026-10-06) |
+
+- COMI ex-dividend 2026-04-07 (EGP 6.00): before it `data/` = 1.049 × `wf` (127.76 / 121.76), after it equal.
+- `auto_adjust=False` is not "as traded": Yahoo still back-adjusts splits (COMI: 2021-08, 2022-09, 2025-12).
+- Rules: execution levels (Entry/SL/TP) from `data/`; returns/PnL from fully adjusted prices (or `data/` + dividends);
+  never combine both folders in one calculation; any new download must state `auto_adjust`/`actions` here.
+- Verified 2026-10-06 on all 90 stocks: `data/` / adjusted Close ratio steps **only** on ex-dividend dates from
+  `docs/corporate_actions.csv` (103 dividends, 29 splits, 61 tickers), ratio = 1 after the last one, volumes equal.
+  Splits are already inside `data/` (no step at split dates). COMI adjusted = `wf` to 0.0001 on 472 shared days.
+- Run log: `docs/adjusted_download_log.json`. Re-run `python fetch_adjusted.py` after any new dividend.
+
+## Missing EGX sessions in Yahoo — `docs/egx_missing_days.csv`
+
+Upper bound of Yahoo gaps, **preliminary sample** (9 stocks in `wf` + 90 in `data/`). A Sun–Thu day counts as
+missing when < 50% of a folder's stocks have a real (non-filler) row. Classified with python-holidays 0.106 (Egypt):
+`holiday` = exact match; `uncertain_near_holiday` = within 3 days (EGX often extends/shifts holidays);
+`unexplained` = no holiday nearby (likely provider gap). Not verified date by date against EGX announcements.
+The ±3-day window is a choice, not a fact: the split between `uncertain` and `unexplained` moves with it.
+If precision is ever needed, verify the worst upper-bound years first (2021, 2023), not all ~95 days.
+
+| Year | holiday | uncertain | unexplained | unexplained / ~245 sessions |
+|---|---|---|---|---|
+| 2020 | 11 | 7 | 9 | 3.7% |
+| 2021 | 13 | 7 | 11 | 4.5% |
+| 2022 | 14 | 3 | 5 | 2.0% |
+| 2023 | 13 | 9 | 8 | 3.3% |
+| 2024 | 15 | 6 | 4 | 1.6% |
+| 2025 | 12 | 6 | 7 | 2.9% |
+| 2026 (to 10-01) | 9 | 7 | 6 | ~3% |
+
+Known real sessions among `unexplained`: 2026-06-22, 2026-08-10. Whole week 2025-08-03..07 missing in `wf`.
+
+## Dividends in backtests (from 2026-10-06)
+
+- `backtest()` and `backtest_optimizer` add net cash dividends (`dividend_tax_pct` 10%, withheld at source) for
+  ex-dates in (entry bar, exit bar], and to Buy & Hold (no reinvestment). Source: `docs/corporate_actions.csv`
+  (Yahoo `Ticker.actions`, full history, gross per share, split-adjusted like `data/`).
+- **Only for dividend-unadjusted prices (`data/`).** `data_2019_2026_wf/`, `data_2022_2023/` (verified = `wf`)
+  and `data_dividend_adjusted/` already contain dividends — calling `with_dividends` on them counts them twice.
+  The optimizer's 2022-23 runs therefore stay without it. Same caution for the dashboard folder picker / CLI path.
+- SL/TP are computed from `data/` prices (not dividend-adjusted). This matches most brokers, but a trade that exits
+  on an ex-date exits at the lower unadjusted price and then receives the dividend in PnL. In the 2026-10-06 sample,
+  5 of 346 trades exited by SL/TRAIL_SL on the ex-date itself (ARCC, BINV, EFID, ETRS, SAUD). The final PnL is right;
+  a broker that auto-adjusts stop levels on ex-dates would give different results.
+
+## Strategy vs Buy & Hold — read with decision_report.md
+
+The dividend change did not move this. 4 Mirrors (Baseline) loses to B&H in every window tested:
+`data/` 2026 sample: beats B&H in 12/90 stocks. 2022-23: Baseline ret -0.05% at 3.3% exposure vs B&H +133% (EGP).
+Raw return vs B&H is not like-for-like (3% vs 100% invested; EGP returns inflated by devaluation — 2022-23 B&H is
++26.6% in USD). The fair comparison, D_hold_6 in EGP and USD over 3 periods, is in `decision_report.md`:
+rule output **ABANDON (confidence MED)** — D beats B&H on USD Sharpe in 1 of 3 periods. One window ≠ another regime.

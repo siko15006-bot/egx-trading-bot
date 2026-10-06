@@ -1,20 +1,19 @@
 $ErrorActionPreference = "Stop"
 
-$taskName = "EGX_Telegram_Bot"
+$taskName = "EGX_Streamlit_Dashboard"
 $project = Split-Path -Parent $MyInvocation.MyCommand.Path
-$scriptPath = Join-Path $project "bot_handlers.py"
-$pythonExe = (Get-Command python).Source
+$pythonw = Join-Path (Split-Path -Parent (Get-Command python).Source) "pythonw.exe"
 $userId = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
 $action = New-ScheduledTaskAction `
-    -Execute $pythonExe `
-    -Argument ('"{0}"' -f $scriptPath) `
+    -Execute $pythonw `
+    -Argument "-m streamlit run egx_dashboard.py --server.address=0.0.0.0 --server.port=8501 --server.headless=true" `
     -WorkingDirectory $project
 
-# AtLogOn ensures the user's network connection and .env are available after Windows starts.
+# AtLogOn, not AtStartup: an Interactive task with a boot trigger is skipped because nobody is signed in yet.
+# Startup order after sign-in: bot 30s, dashboard 1m, watchdog 2m.
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
-# Startup order after sign-in: bot 30s, dashboard 1m, watchdog 2m (weak laptop, stagger RAM load)
-$trigger.Delay = "PT30S"
+$trigger.Delay = "PT1M"
 $principal = New-ScheduledTaskPrincipal -UserId $userId -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
@@ -27,7 +26,7 @@ $settings = New-ScheduledTaskSettingsSet `
 
 Register-ScheduledTask `
     -TaskName $taskName `
-    -Description "Run the EGX interactive Telegram advisor after Windows sign-in." `
+    -Description "Run the EGX Streamlit dashboard (LAN, port 8501) after Windows sign-in." `
     -Action $action `
     -Trigger $trigger `
     -Principal $principal `
@@ -35,6 +34,5 @@ Register-ScheduledTask `
     -Force | Out-Null
 
 Write-Host "Task created: $taskName"
-Write-Host "Trigger: Windows sign-in for $userId"
-Write-Host "Script: $scriptPath"
-Write-Host "Log: $(Join-Path $project 'logs\telegram_advisor.log')"
+Write-Host "Trigger: Windows sign-in for $userId (+1 min)"
+Write-Host "URL: http://127.0.0.1:8501"
