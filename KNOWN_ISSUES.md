@@ -34,3 +34,37 @@ Rule adopted 2026-10-06. Raw CSVs stay untouched; this applies at analysis/backt
   4. Every performance report states the filler count and that metrics cover verifiable rows only.
 - Deferred: re-checking prices via Investing.com (doesn't change handling); alternative provider
   (decide once filler share over 2019-2026 is measured).
+
+## Price series: `data/` and `data_2019_2026_wf/` are different series — never mix them
+
+Found 2026-10-06 on COMI, checked against Yahoo directly.
+
+| Folder | Download | Meaning | Used by |
+|---|---|---|---|
+| `data/` | `data_downloader.py`: `auto_adjust=False, actions=False` | split-adjusted, **dividend-unadjusted** | production: daily_runner, signal_engine, dashboard |
+| `data_2019_2026_wf/` | script not in repo; matches Yahoo `auto_adjust=True` | fully adjusted (splits + dividends) | analysis only: decision_analysis / decision_report |
+
+- COMI ex-dividend 2026-04-07 (EGP 6.00): before it `data/` = 1.049 × `wf` (127.76 / 121.76), after it equal.
+- `auto_adjust=False` is not "as traded": Yahoo still back-adjusts splits (COMI: 2021-08, 2022-09, 2025-12).
+- Rules: execution levels (Entry/SL/TP) from `data/`; returns/PnL from fully adjusted prices (or `data/` + dividends);
+  never combine both folders in one calculation; any new download must state `auto_adjust`/`actions` here.
+- Partial check only: COMI and ADIB compared. The other 81 stocks in `data/` have no adjusted counterpart yet.
+
+## Missing EGX sessions in Yahoo — `docs/egx_missing_days.csv`
+
+Upper bound of Yahoo gaps, **preliminary sample** (9 stocks in `wf` + 90 in `data/`). A Sun–Thu day counts as
+missing when < 50% of a folder's stocks have a real (non-filler) row. Classified with python-holidays 0.106 (Egypt):
+`holiday` = exact match; `uncertain_near_holiday` = within 3 days (EGX often extends/shifts holidays);
+`unexplained` = no holiday nearby (likely provider gap). Not verified date by date against EGX announcements.
+
+| Year | holiday | uncertain | unexplained | unexplained / ~245 sessions |
+|---|---|---|---|---|
+| 2020 | 11 | 7 | 9 | 3.7% |
+| 2021 | 13 | 7 | 11 | 4.5% |
+| 2022 | 14 | 3 | 5 | 2.0% |
+| 2023 | 13 | 9 | 8 | 3.3% |
+| 2024 | 15 | 6 | 4 | 1.6% |
+| 2025 | 12 | 6 | 7 | 2.9% |
+| 2026 (to 10-01) | 9 | 7 | 6 | ~3% |
+
+Known real sessions among `unexplained`: 2026-06-22, 2026-08-10. Whole week 2025-08-03..07 missing in `wf`.
