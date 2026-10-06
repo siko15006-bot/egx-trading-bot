@@ -15,15 +15,20 @@ same universe over the following month, in USD, after fees.
 
 ## Decision rule (no free parameters)
 
-- **Universe:** the 90 tickers in `egx_universe.json` v90-20261005. A stock is eligible on a rebalance day if it has
-  ≥ 147 real (non-filler, per `KNOWN_ISSUES.md`) daily bars and ≥ 15 real bars in the last 21.
+- **Universe:** every ticker in `egx_universe.json` v90-20261005 `records` (401 candidates, passed or not) plus TALM
+  and KZPC (large caps on Yahoo, missing from the manifest). Not limited to today's 90 "passed" names, because that
+  filter uses today's liquidity and price (look-ahead). Large caps absent from Yahoo (Ezz Steel, QNB, EKHO, Valu,
+  Madinet Nasr) cannot be included.
+- **Eligibility (point-in-time, each rebalance day):** ≥ 147 real (non-filler, per `KNOWN_ISSUES.md`) bars,
+  ≥ 15 real bars in the last 21, then the **top 60 by median daily traded value (Close × Volume, EGP) over the last
+  63 bars**. Liquidity is ranked, not thresholded, so EGP inflation does not move the bar.
 - **Prices:** fully adjusted Yahoo closes (`auto_adjust=True`, total return). Downloaded into `data_momentum_2019/`,
   which is added to `KNOWN_ADJUSTED_FOLDERS`.
 - **Signal:** return from t−126 to t−21 trading days (close to close).
 - **Portfolio:** top 10 eligible stocks by signal, equal weight. Fewer than 10 eligible → hold all eligible.
 - **Rebalance:** every 21 trading days, at the close (signal and trade at the same close; no look-ahead beyond it).
 - **Costs:** `RiskConfig.round_trip_fee_pct` (0.3%) on turnover. Taxes ignored for both sides.
-- **Benchmark:** equal-weight, same eligible universe, same rebalance dates and costs. Same survivorship bias on
+- **Benchmark:** equal-weight, same eligible (top-60) universe, same rebalance dates and costs. Same survivorship bias on
   both sides, so the comparison is fair even though absolute returns are not.
 - **Currency:** USD via `data_2019_2026_wf/fx/EGP_USD.csv` (primary). EGP reported alongside.
 
@@ -58,3 +63,6 @@ Nothing goes to production, Telegram, or paper trading unless all success criter
 ## Edit log
 
 - 2026-10-06: created.
+- 2026-10-06 (before any download/run): universe widened from the 90 passed names to all 401 manifest candidates
+  + TALM, KZPC, with a point-in-time top-60 liquidity rank. Reason: Ahmed asked for more large caps; the 90-name
+  filter used today's liquidity/price (look-ahead) and dropped large low-priced names such as BTFH.
