@@ -1,4 +1,7 @@
-# H2 — ML filter for 4 Mirrors signals (pre-registration, DRAFT for review)
+# H2 — ML filter for 4 Mirrors signals — **NOT RUN, superseded by H3**
+
+> 2026-10-07: dropped before any data/model. A filter can only pick the better part of a ~breakeven, ABANDONed
+> strategy; H3 (AI Score) tests an independent ranking instead. Kept for the record.
 
 Written 2026-10-07, **before** any training data was built or any model was fit.
 Changing anything below after seeing validation results = H2 failed. Edits before the first run go in the edit log.
