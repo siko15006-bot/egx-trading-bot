@@ -60,6 +60,27 @@ choosing: lookback 63/252 days, N = 5/15. If H1 fails, the next hypothesis needs
 
 Nothing goes to production, Telegram, or paper trading unless all success criteria pass **and** Ahmed approves.
 
+## Result (single run, 2026-10-06) — **FAIL**
+
+Panel: 403 tickers, 2019-01-01 → 2026-10-06 (FX to 2026-10-02). Full output: `H1_result.txt`, code: `research_h1_momentum.py`.
+
+| USD | H1 Sharpe | H1 CAGR | H1 max DD | EW Sharpe | EW CAGR | EW max DD |
+|---|---|---|---|---|---|---|
+| Train (→2022) | -0.05 | -8.0% | -68.3% | 0.14 | -0.3% | -52.2% |
+| Validation (2023→) | 0.32 | +4.4% | -56.6% | 0.83 | +23.7% | -53.3% |
+
+Criteria: 1 FAIL (Sharpe diff −0.51), 2 FAIL, 3 PASS, 4 FAIL. All four info-only variants (lookback 63/252, N 5/15)
+also lose to the equal-weight benchmark in both periods, so the failure is not a parameter accident.
+Per the rules above, H1 is closed; no re-run with other parameters.
+
+Scope of this result:
+- Only cross-sectional momentum (rank and hold the top N) was tested; the 4 variants are sensitivity checks of the
+  same family. Time-series momentum, trend-filtered, volume-confirmed and risk-adjusted momentum were not tested and
+  are outside H1.
+- The winner is an equal-weight portfolio of the 60 most liquid names, rebalanced every 21 days **after the same
+  fees** (0.15% per side on turnover); taxes and slippage are excluded for both. It is not the cap-weighted market:
+  EGX30 / value-weighted comparison was not tested, and 2023-2026 is one ~4-year window.
+
 ## Edit log
 
 - 2026-10-06: created.
