@@ -60,8 +60,10 @@ def load_panels() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
 
 
 def run(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFrame,
-        lookback: int = 126, skip: int = 21, top_n: int = 10, top_liq: int = 60) -> tuple[pd.Series, pd.Series]:
-    """Daily EGP returns of (H1, equal-weight benchmark). Weights drift between rebalances."""
+        lookback: int = 126, skip: int = 21, top_n: int = 10, top_liq: int = 60,
+        score: pd.DataFrame | None = None) -> tuple[pd.Series, pd.Series]:
+    """Daily EGP returns of (H1, equal-weight benchmark). Weights drift between rebalances.
+    `score` (same index as close) replaces the momentum signal — used by H3; default keeps H1 unchanged."""
     px = close.ffill()
     rets = px.pct_change().fillna(0.0)
     real_count, recent = is_real.cumsum(), is_real.rolling(21).sum()
@@ -81,7 +83,7 @@ def run(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFrame,
         if p in rebal:  # signal and trade at this close; returns from p+1 on
             ok = (real_count.iloc[p] >= 147) & (recent.iloc[p] >= 15) & is_real.iloc[p]
             pool = liq.iloc[p][ok].dropna().nlargest(top_liq).index
-            signal = (px.iloc[p - skip] / px.iloc[p - lookback] - 1)[pool].dropna()
+            signal = (score.iloc[p] if score is not None else px.iloc[p - skip] / px.iloc[p - lookback] - 1)[pool].dropna()
             assert p - skip < p and p - lookback >= 0  # signal uses only past closes
             new_h = pd.Series(1 / min(top_n, len(signal)), index=signal.nlargest(top_n).index) if len(signal) else w_h
             new_b = pd.Series(1 / len(pool), index=pool) if len(pool) else w_b

@@ -62,6 +62,30 @@ No retry with other features, models, horizons or thresholds.
 Survivorship (today's 403 names); EGP inflation (handled by cross-sectional ranks + USD for Level 1);
 ~45 validation rebalance days only — a small sample for Level 2.
 
+## Result (single run, 2026-10-07) — **Level 1 PASS, Level 2 PASS → trading-signal candidate**
+
+Full output: `H3_result.txt`, code: `research_h3_ai_score.py`. Train 2,274 stock-days on 38 rebalance days.
+
+| USD | H3 Sharpe | H3 CAGR | H3 max DD | EW Sharpe | EW CAGR | EW max DD |
+|---|---|---|---|---|---|---|
+| Train (in-sample) | 1.37 | +38.2% | −36.8% | 0.14 | −0.3% | −52.2% |
+| **Validation 2023→** | **1.31** | **+47.2%** | −54.3% | 0.83 | +23.7% | −53.3% |
+
+Level 2: 41 validation days, mean Spearman IC +0.063, positive on 71% of days, one-sided p = 0.009.
+Largest weights: near the 252-day high (+), last-month return (−, short-term reversal), 6-1 momentum (−),
+liquidity (−), volatility (−).
+
+**Post-hoc checks (information only — they do not change the pre-registered verdict):**
+- Executing one session later (features one day stale, which is what Ahmed can actually do after the close):
+  validation USD Sharpe 1.04 vs 0.83, CAGR +33.6% vs +23.7%. Still ahead of EW, but the Sharpe gap (0.21) would
+  **not** clear the 0.30 bar — part of the edge comes from trading at the same close (short-term reversal).
+- Without the last-month-return feature: validation USD Sharpe 1.13, CAGR +38.4% — the result does not rest on
+  that single feature.
+
+**What this does and does not mean:** one 3.8-year validation window, survivorship-biased universe, no taxes or
+slippage. It is a candidate, not a proven strategy. Next step (needs Ahmed's approval): forward-track the daily
+top 10 with no money for at least 3 months, then judge on those results only.
+
 ## Edit log
 
 - 2026-10-07: created (replaces the H2 filter idea; two-level decision agreed in review).
