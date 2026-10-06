@@ -211,6 +211,7 @@ def _portfolio_message() -> str:
         "📝 <b>Paper Trading Portfolio</b>",
         f"مفتوحة: {len(opened)} | مغلقة: {summary['trades']}",
         f"Win Rate: {summary['win_rate']:.1f}% | Net PnL: {summary['net_pnl']:+,.2f} EGP",
+        "⚠️ PnL لا يشمل التوزيعات (أقل من الفعلي لو الصفقة عدّت تاريخ الاستحقاق).",
         f"تقدم الحملة: {campaign['closed_trades']}/{campaign['target_trades']} صفقة مغلقة",
     ]
     for row in opened.head(10).itertuples():
