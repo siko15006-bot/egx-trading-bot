@@ -43,12 +43,16 @@ Found 2026-10-06 on COMI, checked against Yahoo directly.
 |---|---|---|---|
 | `data/` | `data_downloader.py`: `auto_adjust=False, actions=False` | split-adjusted, **dividend-unadjusted** | production: daily_runner, signal_engine, dashboard |
 | `data_2019_2026_wf/` | script not in repo; matches Yahoo `auto_adjust=True` | fully adjusted (splits + dividends) | analysis only: decision_analysis / decision_report |
+| `data_dividend_adjusted/` | `fetch_adjusted.py`: `auto_adjust=True, actions=True`, 2y, yfinance 1.2.0 | fully adjusted + `Dividends`/`Stock Splits` columns; companion to `data/`, **not a replacement** | returns/PnL (from 2026-10-06) |
 
 - COMI ex-dividend 2026-04-07 (EGP 6.00): before it `data/` = 1.049 × `wf` (127.76 / 121.76), after it equal.
 - `auto_adjust=False` is not "as traded": Yahoo still back-adjusts splits (COMI: 2021-08, 2022-09, 2025-12).
 - Rules: execution levels (Entry/SL/TP) from `data/`; returns/PnL from fully adjusted prices (or `data/` + dividends);
   never combine both folders in one calculation; any new download must state `auto_adjust`/`actions` here.
-- Partial check only: COMI and ADIB compared. The other 81 stocks in `data/` have no adjusted counterpart yet.
+- Verified 2026-10-06 on all 90 stocks: `data/` / adjusted Close ratio steps **only** on ex-dividend dates from
+  `docs/corporate_actions.csv` (103 dividends, 29 splits, 61 tickers), ratio = 1 after the last one, volumes equal.
+  Splits are already inside `data/` (no step at split dates). COMI adjusted = `wf` to 0.0001 on 472 shared days.
+- Run log: `docs/adjusted_download_log.json`. Re-run `python fetch_adjusted.py` after any new dividend.
 
 ## Missing EGX sessions in Yahoo — `docs/egx_missing_days.csv`
 
@@ -56,6 +60,8 @@ Upper bound of Yahoo gaps, **preliminary sample** (9 stocks in `wf` + 90 in `dat
 missing when < 50% of a folder's stocks have a real (non-filler) row. Classified with python-holidays 0.106 (Egypt):
 `holiday` = exact match; `uncertain_near_holiday` = within 3 days (EGX often extends/shifts holidays);
 `unexplained` = no holiday nearby (likely provider gap). Not verified date by date against EGX announcements.
+The ±3-day window is a choice, not a fact: the split between `uncertain` and `unexplained` moves with it.
+If precision is ever needed, verify the worst upper-bound years first (2021, 2023), not all ~95 days.
 
 | Year | holiday | uncertain | unexplained | unexplained / ~245 sessions |
 |---|---|---|---|---|
