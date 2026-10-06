@@ -1,0 +1,30 @@
+﻿# Environment - DO NOT COMMIT
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# Data & Backups
+data/
+data_*/
+logs/
+reports/
+backups/
+*.db
+*.db.bak_*
+*.db.backup*
+
+# IDE & OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+*.log

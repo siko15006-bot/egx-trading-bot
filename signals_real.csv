@@ -1,0 +1,10 @@
+﻿Ticker,Status,Entry,SL,TP,ATR,Shares,RR_Net,Sector,Checks
+ADIB.CA,WAIT,,,,,,,Banks,Trend=False; Momentum=False; Volume=False; Volatility=False
+COMI.CA,WAIT,,,,,,,Banks,Trend=False; Momentum=False; Volume=False; Volatility=False
+EAST.CA,WAIT,,,,,,,Industrial,Trend=False; Momentum=False; Volume=False; Volatility=False
+EFIH.CA,WAIT,,,,,,,Financials,Trend=False; Momentum=False; Volume=False; Volatility=True
+ETEL.CA,WAIT,,,,,,,Telecom,Trend=True; Momentum=False; Volume=False; Volatility=True
+HRHO.CA,WAIT,,,,,,,Financials,Trend=False; Momentum=False; Volume=False; Volatility=False
+MNHD.CA,NO_TREND,,,,,,,RealEstate,Trend=False; Momentum=False; Volume=False; Volatility=False
+SWDY.CA,WAIT,,,,,,,Industrial,Trend=False; Momentum=False; Volume=False; Volatility=False
+TMGH.CA,WAIT,,,,,,,RealEstate,Trend=False; Momentum=False; Volume=False; Volatility=False

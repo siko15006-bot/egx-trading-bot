@@ -1,0 +1,91 @@
+//@version=5
+indicator("EGX 4 Mirrors v3", overlay=true, max_labels_count=500)
+
+// إعدادات الاتجاه والزخم
+ema20Len = input.int(20, "EMA 20", minval=1)
+ema50Len = input.int(50, "EMA 50", minval=1)
+ema200Len = input.int(200, "EMA 200", minval=1)
+rsiLen = input.int(14, "RSI Length", minval=1)
+volumeMult = input.float(1.2, "Volume Multiplier", minval=0.1, step=0.1)
+adxMin = input.float(20.0, "ADX Minimum", minval=0.0, step=1.0)
+
+// إعدادات التذبذب والمخاطر
+atrLen = input.int(14, "ATR Length", minval=1)
+atrSlMult = input.float(1.5, "ATR Stop Multiplier", minval=0.1, step=0.1)
+rrRatio = input.float(2.0, "Risk:Reward", minval=1.0, step=0.1)
+gapMax = input.float(4.0, "Maximum Gap %", minval=0.0, step=0.1)
+bbLen = input.int(20, "BB Length", minval=1)
+bbMult = input.float(2.0, "BB Multiplier", minval=0.1, step=0.1)
+atrPctMin = input.float(1.5, "ATR % Minimum", minval=0.0, step=0.1)
+bbWidthMin = input.float(0.035, "BB Width Minimum", minval=0.0, step=0.005)
+
+// حساب المؤشرات بنفس إعدادات محرك Python
+ema20 = ta.ema(close, ema20Len)
+ema50 = ta.ema(close, ema50Len)
+ema200 = ta.ema(close, ema200Len)
+rsi = ta.rsi(close, rsiLen)
+[macdLine, macdSignal, macdHist] = ta.macd(close, 12, 26, 9)
+volumeSma20 = ta.sma(volume, 20)
+obv = ta.cum(math.sign(ta.change(close)) * volume)
+obvSma20 = ta.sma(obv, 20)
+// v3: لحظي = VWAP الجلسة (يبدأ من جديد كل يوم)؛ يومي = VWAP_20 (مجموع 20 شمعة) لأن VWAP اليوم على شمعة يومية = الإغلاق
+vwap20 = math.sum(close * volume, 20) / math.max(math.sum(volume, 20), 1)
+float vwapValue = na
+if timeframe.isintraday
+    vwapValue := ta.vwap(close)
+else
+    vwapValue := vwap20
+bbMid = ta.sma(close, bbLen)
+bbStd = ta.stdev(close, bbLen)
+bbUpper = bbMid + bbMult * bbStd
+bbLower = bbMid - bbMult * bbStd
+bbWidth = bbMid != 0 ? (bbUpper - bbLower) / bbMid : 0.0
+atr = ta.atr(atrLen)
+atrPct = close != 0 ? atr / close * 100 : 0.0
+[plusDI, minusDI, adx] = ta.dmi(atrLen, atrLen)
+gapPct = not na(close[1]) and close[1] != 0 ? (open - close[1]) / close[1] * 100 : 0.0
+
+// المرايا الأربع والفلاتر
+trendMirror = close > ema50 and ema20 > ema50 and close > ema200 and ema50 > ema50[5]
+momentumMirror = rsi >= 50 and rsi <= 70 and macdHist > 0
+volumeMirror = volume > volumeMult * volumeSma20 and obv > obvSma20 and close > vwapValue
+volatilityMirror = close > bbMid and atrPct >= atrPctMin and bbWidth >= bbWidthMin
+gapFilter = math.abs(gapPct) <= gapMax
+adxFilter = adx >= adxMin
+buySignal = barstate.isconfirmed and gapFilter and adxFilter and trendMirror and momentumMirror and volumeMirror and volatilityMirror
+buyEvent = buySignal and not buySignal[1]
+
+// إدارة حالة الصفقة ومستويات ATR
+var bool inTrade = false
+var float entryPrice = na
+var float stopPrice = na
+var float targetPrice = na
+
+if buyEvent and not inTrade
+    entryPrice := close
+    stopPrice := close - atrSlMult * atr
+    targetPrice := close + atrSlMult * atr * rrRatio
+    inTrade := true
+    label.new(bar_index, low, "BUY\nADX " + str.tostring(adx, "#.0") + "\nATR% " + str.tostring(atrPct, "#.00"), style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white)
+
+slHit = inTrade and low <= stopPrice
+tpHit = inTrade and not slHit and high >= targetPrice
+
+if slHit or tpHit
+    inTrade := false
+
+// أول ثلاثة plots مخصصة لقيم Webhook plot_0/1/2
+plot(entryPrice, "Entry", color=color.green, linewidth=2, style=plot.style_linebr)
+plot(stopPrice, "Stop Loss", color=color.red, linewidth=2, style=plot.style_linebr)
+plot(targetPrice, "Take Profit", color=color.blue, linewidth=2, style=plot.style_linebr)
+plot(ema20, "EMA 20", color=color.blue)
+plot(ema50, "EMA 50", color=color.orange)
+plot(ema200, "EMA 200", color=color.red)
+plot(bbUpper, "BB Upper", color=color.new(color.gray, 55))
+plot(bbLower, "BB Lower", color=color.new(color.gray, 55))
+plotshape(buyEvent, title="BUY Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, text="BUY")
+
+// رسائل Webhook الجاهزة لـ TradingView
+alertcondition(buyEvent, title="EGX BUY", message="{\"ticker\":\"{{ticker}}\",\"action\":\"BUY\",\"price\":\"{{close}}\",\"entry\":\"{{plot_0}}\",\"sl\":\"{{plot_1}}\",\"tp\":\"{{plot_2}}\"}")
+alertcondition(slHit, title="EGX SL Hit", message="{\"ticker\":\"{{ticker}}\",\"action\":\"SL_HIT\",\"price\":\"{{close}}\",\"entry\":\"{{plot_0}}\",\"sl\":\"{{plot_1}}\",\"tp\":\"{{plot_2}}\"}")
+alertcondition(tpHit, title="EGX TP Hit", message="{\"ticker\":\"{{ticker}}\",\"action\":\"TP_HIT\",\"price\":\"{{close}}\",\"entry\":\"{{plot_0}}\",\"sl\":\"{{plot_1}}\",\"tp\":\"{{plot_2}}\"}")

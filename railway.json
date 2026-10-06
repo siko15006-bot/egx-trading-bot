@@ -1,0 +1,4 @@
+{
+  "build": {"builder": "DOCKERFILE"},
+  "deploy": {"startCommand": "python tv_webhook_server.py", "restartPolicyType": "ON_FAILURE"}
+}
