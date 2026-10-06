@@ -86,6 +86,34 @@ liquidity (−), volatility (−).
 slippage. It is a candidate, not a proven strategy. Next step (needs Ahmed's approval): forward-track the daily
 top 10 with no money for at least 3 months, then judge on those results only.
 
+## Classification after review (2026-10-07)
+
+Level 1 is judged on **realistic execution** (Ahmed sees the score after the close and buys at the next open).
+Under that standard the Sharpe gap is 0.21 < 0.30, so: **Level 1 = PENDING, Level 2 = PASS.** No real money.
+
+## Forward test protocol (fixed before it starts)
+
+- **Model frozen:** coefficients and scaler from the 2019–2022 fit saved in `docs/research/H3_model.json`. Never refit.
+- **Schedule:** a rebalance every 21 EGX sessions, counted on the production calendar (`data/`); the first one is the
+  first session processed after this commit. Run daily by the scheduled task `EGX_H3_Forward`.
+- **Universe / top 10:** same 403 candidates, freshly downloaded fully adjusted (`data_h3_live/`), H1 eligibility
+  (≥147 real bars, ≥15 real of last 21, real bar on the day, top 60 by 63-day median traded value), no price filter.
+  Top 10 = highest score; ties broken by ticker A→Z. Benchmark = equal weight of the same 60.
+- **Two executions recorded:** ideal (close of the rebalance day → close of the next) and realistic (open of the
+  next session → open of the session after the next rebalance). Both net of 0.3% per period for the top 10
+  (full turnover assumed) and 0 for the benchmark. Realistic periods complete one session later.
+- **Kill switch (realistic):** stop if cumulative top-10 return minus cumulative EW return ≤ −10 percentage points at
+  any completed period.
+- **After 3 periods:** judge operation only (runs on time, no errors, messages arrive). No performance verdict.
+- **After 12 periods (~1 year), realistic execution decides:**
+  1. cumulative top-10 return > cumulative EW return, **and**
+  2. mean per-period Spearman IC > 0 (one-sided t-test p < 0.10 — n = 12 is small).
+  Both → "confirmed candidate": Ahmed may decide on small real money; the forward test continues.
+  Either fails → H3 closed for trading; the score may stay as a screening tool only if (2) holds.
+  No changes to features, model or schedule during the 12 periods; any change restarts the count as a new hypothesis.
+- **Separate from auto-sim:** own table `h3_forward`, own dashboard section, own Telegram message.
+
 ## Edit log
 
 - 2026-10-07: created (replaces the H2 filter idea; two-level decision agreed in review).
+- 2026-10-07 (after the run): classification on realistic execution and forward-test protocol added; no change to the run.
