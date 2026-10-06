@@ -74,3 +74,16 @@ If precision is ever needed, verify the worst upper-bound years first (2021, 202
 | 2026 (to 10-01) | 9 | 7 | 6 | ~3% |
 
 Known real sessions among `unexplained`: 2026-06-22, 2026-08-10. Whole week 2025-08-03..07 missing in `wf`.
+
+## Dividends in backtests (from 2026-10-06)
+
+- `backtest()` and `backtest_optimizer` add net cash dividends (`dividend_tax_pct` 10%, withheld at source) for
+  ex-dates in (entry bar, exit bar], and to Buy & Hold (no reinvestment). Source: `docs/corporate_actions.csv`
+  (Yahoo `Ticker.actions`, full history, gross per share, split-adjusted like `data/`).
+- **Only for dividend-unadjusted prices (`data/`).** `data_2019_2026_wf/`, `data_2022_2023/` (verified = `wf`)
+  and `data_dividend_adjusted/` already contain dividends — calling `with_dividends` on them counts them twice.
+  The optimizer's 2022-23 runs therefore stay without it. Same caution for the dashboard folder picker / CLI path.
+- SL/TP are computed from `data/` prices (not dividend-adjusted). This matches most brokers, but a trade that exits
+  on an ex-date exits at the lower unadjusted price and then receives the dividend in PnL. In the 2026-10-06 sample,
+  5 of 346 trades exited by SL/TRAIL_SL on the ex-date itself (ARCC, BINV, EFID, ETRS, SAUD). The final PnL is right;
+  a broker that auto-adjusts stop levels on ex-dates would give different results.

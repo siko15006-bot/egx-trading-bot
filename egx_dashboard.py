@@ -45,6 +45,7 @@ from egx_4_mirrors_v3 import (
     SignalConfig,
     SystemConfig,
     backtest,
+    with_dividends,
     build_trade_plan,
     calculate_indicators,
     evaluate_4_mirrors,
@@ -575,7 +576,7 @@ def render_tab4(screen_cfg: ScreenConfig, signal_cfg: SignalConfig, risk_cfg: Ri
                 risk=replace(risk_cfg, capital=capital, risk_pct=risk_pct / 100, atr_sl_mult=atr_mult, reward_risk=rr_ratio),
             )
             with st.spinner("Running event-driven backtest..."):
-                stats = backtest(selected, cfg)
+                stats = backtest(with_dividends(ticker, selected), cfg)
                 if not stats["trades"].empty:
                     stats["trades"]["Ticker"] = ticker
                 st.session_state.backtest_result = {"ticker": ticker, "stats": stats, "config": cfg}

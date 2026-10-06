@@ -45,12 +45,14 @@ def main() -> int:
         log["files"][t] = {"rows": len(frame), "first": frame.index[0], "last": frame.index[-1],
                            "dividends": int((frame["Dividends"] != 0).sum()),
                            "splits": int((frame["Stock Splits"] != 0).sum())}
-    # Rebuild the tracked actions list from every file on disk (cheap, always consistent).
+    # Full-history actions (not just the 2y window): backtests on older folders need them too.
     rows = []
-    for f in sorted(OUT.glob("*.csv")):
-        d = pd.read_csv(f)
-        hit = d[(d["Dividends"] != 0) | (d["Stock Splits"] != 0)]
-        rows += [(f.stem, *r) for r in hit[["Date", "Dividends", "Stock Splits"]].itertuples(index=False)]
+    for t in tickers:
+        acts = yf.Ticker(t).actions
+        if acts is None or acts.empty:
+            continue
+        acts = acts[(acts["Dividends"] != 0) | (acts["Stock Splits"] != 0)]
+        rows += [(t, d.strftime("%Y-%m-%d"), r["Dividends"], r["Stock Splits"]) for d, r in acts.iterrows()]
     ACTIONS_CSV.parent.mkdir(exist_ok=True)
     pd.DataFrame(rows, columns=["ticker", "ex_date", "dividend", "split"]).to_csv(ACTIONS_CSV, index=False)
     LOG.write_text(json.dumps(log, indent=2, ensure_ascii=False), encoding="utf-8")
