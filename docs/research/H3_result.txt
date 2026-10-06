@@ -1,0 +1,11 @@
+train rows 2274 on 38 days | coefficients: {'r21': np.float64(-0.269), 'r63': np.float64(0.007), 'mom': np.float64(-0.197), 'r252': np.float64(-0.043), 'vol63': np.float64(-0.101), 'rsi14': np.float64(0.071), 'ema50_dist': np.float64(0.082), 'range252': np.float64(0.344), 'liq_trend': np.float64(-0.076), 'liq': np.float64(-0.129)}
+H3 AI SCORE            USD train      H1 Sharpe  1.37 CAGR  +38.2% DD -36.8% | EW Sharpe  0.14 CAGR   -0.3% DD -52.2% | days 805
+H3 AI SCORE            USD validation H1 Sharpe  1.31 CAGR  +47.2% DD -54.3% | EW Sharpe  0.83 CAGR  +23.7% DD -53.3% | days 878
+H3 AI SCORE            EGP train      H1 Sharpe  2.02 CAGR  +56.6% DD -31.6% | EW Sharpe  0.59 CAGR  +13.3% DD -45.2% | days 807
+H3 AI SCORE            EGP validation H1 Sharpe  2.39 CAGR  +82.1% DD -29.6% | EW Sharpe  1.86 CAGR  +53.3% DD -28.5% | days 881
+  PASS  L1 1 val Sharpe diff >= 0.30
+  PASS  L1 2 val CAGR > EW
+  PASS  L1 3 val DD not worse by >10pp
+  PASS  L1 4 train Sharpe > EW
+L2 IC: 41 days, mean +0.0628, positive days 71%, one-sided p = 0.0090 → PASS
+H3 VERDICT: TRADING-SIGNAL CANDIDATE
