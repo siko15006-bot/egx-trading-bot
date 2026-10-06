@@ -383,6 +383,27 @@ def limit_sector_exposure(
 
 
 ACTIONS_CSV = Path(__file__).with_name("docs") / "corporate_actions.csv"
+# فولدرات أسعارها معدّلة بالتوزيعات أصلًا (auto_adjust=True) — إضافة التوزيعات عليها = حسابها مرتين.
+# كل واحد اتفحص بمقارنة COMI/EAST مع data_2019_2026_wf أو Yahoo مباشرة (KNOWN_ISSUES.md). أي فولدر معدّل جديد يتضاف هنا.
+KNOWN_ADJUSTED_FOLDERS = frozenset({"data_2019_2026_wf", "data_2022_2023", "data_2020_2021", "data_dividend_adjusted"})
+KNOWN_UNADJUSTED_FOLDERS = frozenset({"data"})  # data_downloader.py: auto_adjust=False
+
+
+# يحدد هل نضيف التوزيعات للـbacktest. فولدر معروف بمود مخالف أو فولدر مش معروف من غير مود → خطأ صريح.
+def resolve_dividend_mode(folder: str | Path, mode: Optional[str] = None) -> tuple[str, str]:
+    name = Path(folder).name
+    if mode not in (None, "add", "none"):
+        raise ValueError(f"dividend mode must be 'add' or 'none', got {mode!r}")
+    expected = "none" if name in KNOWN_ADJUSTED_FOLDERS else "add" if name in KNOWN_UNADJUSTED_FOLDERS else None
+    if expected is None:
+        if mode is None:
+            raise ValueError(f"unknown data folder {name!r}: pass dividend mode 'add' (dividend-unadjusted prices) or 'none' (adjusted)")
+        return mode, f"Data folder: {name}/    Dividend mode: {mode}    (user-set, unverified)"
+    if mode not in (None, expected):
+        kind = "dividend-adjusted" if expected == "none" else "dividend-unadjusted"
+        raise ValueError(f"data folder {name!r} is {kind}; dividend mode must be {expected!r}, got {mode!r}")
+    state = "adjusted" if expected == "none" else "unadjusted"
+    return expected, f"Data folder: {name}/    Dividend mode: {expected}    ({state}, verified)"
 
 
 # يضيف عمود Dividends (توزيع/سهم، قبل الضريبة) على تاريخ الاستحقاق — للـbacktest فقط، الإنتاج مش محتاجه.
@@ -684,6 +705,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--risk", type=float, default=0.01)
     parser.add_argument("--out", default="")
     parser.add_argument("--backtest", action="store_true")
+    parser.add_argument("--dividend-mode", choices=["add", "none"], help="required for data folders not in KNOWN_*_FOLDERS")
     parser.add_argument("--sector-limit", type=int, default=2)
     parser.add_argument("--min-adx", type=float, default=20.0)
     return parser.parse_args()
@@ -697,6 +719,10 @@ def main() -> None:
     system_cfg = SystemConfig(screen=screen_cfg, signal=signal_cfg, risk=risk_cfg)
 
     data_map = load_data_map(Path(args.path_or_folder)) if args.path_or_folder else {"DEMO.CA": _demo_data()}
+    if args.backtest:
+        source = Path(args.path_or_folder) if args.path_or_folder else Path("demo")
+        dividend_mode, dividend_line = resolve_dividend_mode(source if source.is_dir() else source.parent, args.dividend_mode)
+        print(dividend_line)
     signals = scan_universe(data_map, screen_cfg, signal_cfg, risk_cfg, args.sector_limit)
     generated_utc = pd.Timestamp.now(tz=UTC_TZ)
     generated_cairo = generated_utc.tz_convert(CAIRO_TZ)
@@ -710,7 +736,7 @@ def main() -> None:
 
     if args.backtest:
         for ticker, data in data_map.items():
-            stats = backtest(with_dividends(ticker, data), system_cfg)
+            stats = backtest(with_dividends(ticker, data) if dividend_mode == "add" else data, system_cfg)
             print(f"\nBacktest {ticker}")
             for key, value in stats.items():
                 print(f"{key}: {value}")

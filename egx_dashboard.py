@@ -44,7 +44,10 @@ from egx_4_mirrors_v3 import (
     SECTOR_MAP,
     SignalConfig,
     SystemConfig,
+    KNOWN_ADJUSTED_FOLDERS,
+    KNOWN_UNADJUSTED_FOLDERS,
     backtest,
+    resolve_dividend_mode,
     with_dividends,
     build_trade_plan,
     calculate_indicators,
@@ -180,6 +183,7 @@ def _init_state() -> None:
         folder = Path(__file__).parent / "data"
         if folder.is_dir() and any(folder.glob("*.csv")):
             st.session_state.data_map = load_folder(str(folder))
+            st.session_state.data_folder = str(folder)
         st.session_state.universe_version = MANIFEST["version"]
         st.session_state.scanner_results = pd.DataFrame()
 
@@ -246,14 +250,17 @@ def _sidebar() -> tuple[ScreenConfig, SignalConfig, RiskConfig, int]:
             if st.sidebar.button("Load", width="stretch"):
                 with st.spinner("Loading CSV files..."):
                     st.session_state.data_map = load_folder(folder)
+                    st.session_state.data_folder = folder
         elif source == "Upload Files":
             uploads = st.sidebar.file_uploader("Upload CSV files", type=["csv"], accept_multiple_files=True)
             if uploads and st.sidebar.button("Load uploads", width="stretch"):
                 payload = tuple((file.name, file.getvalue()) for file in uploads)
                 with st.spinner("Validating uploads..."):
                     st.session_state.data_map = load_uploads(payload)
+                    st.session_state.data_folder = "uploads"
         elif st.sidebar.button("Generate 5 demo stocks", width="stretch"):
             st.session_state.data_map = generate_demo_data()
+            st.session_state.data_folder = "demo"
     except (ValueError, OSError, pd.errors.ParserError) as exc:
         st.sidebar.error(str(exc))
 
@@ -563,11 +570,23 @@ def render_tab4(screen_cfg: ScreenConfig, signal_cfg: SignalConfig, risk_cfg: Ri
     rr_ratio = controls[3].slider("R:R", 1.0, 5.0, risk_cfg.reward_risk, 0.1)
     min_adx = controls[4].slider("Min ADX", 0.0, 50.0, signal_cfg.min_adx, 1.0)
 
+    data_folder = st.session_state.get("data_folder", "data")
+    known = Path(data_folder).name in KNOWN_ADJUSTED_FOLDERS | KNOWN_UNADJUSTED_FOLDERS
+    chosen_mode = None if known else st.radio(
+        "Dividend mode — مصدر بيانات غير معروف: add = أسعار غير معدّلة بالتوزيعات، none = معدّلة",
+        ["add", "none"], index=None, horizontal=True, key="bt_dividend_mode")
     if st.button("Run Backtest", type="primary"):
         start, end = dates if isinstance(dates, tuple) and len(dates) == 2 else (raw.index.min().date(), raw.index.max().date())
         mask = (raw.index.date >= start) & (raw.index.date <= end)
         selected = raw.loc[mask]
-        if len(selected) < 61:
+        try:
+            dividend_mode, dividend_line = resolve_dividend_mode(data_folder, chosen_mode)
+        except ValueError as exc:
+            dividend_mode = None
+            st.error(str(exc))
+        if dividend_mode is None:
+            pass
+        elif len(selected) < 61:
             st.error("الفترة المختارة تحتاج إلى 61 جلسة على الأقل.")
         else:
             cfg = SystemConfig(
@@ -576,16 +595,17 @@ def render_tab4(screen_cfg: ScreenConfig, signal_cfg: SignalConfig, risk_cfg: Ri
                 risk=replace(risk_cfg, capital=capital, risk_pct=risk_pct / 100, atr_sl_mult=atr_mult, reward_risk=rr_ratio),
             )
             with st.spinner("Running event-driven backtest..."):
-                stats = backtest(with_dividends(ticker, selected), cfg)
+                stats = backtest(with_dividends(ticker, selected) if dividend_mode == "add" else selected, cfg)
                 if not stats["trades"].empty:
                     stats["trades"]["Ticker"] = ticker
-                st.session_state.backtest_result = {"ticker": ticker, "stats": stats, "config": cfg}
+                st.session_state.backtest_result = {"ticker": ticker, "stats": stats, "config": cfg, "data_line": dividend_line}
 
     stored = st.session_state.backtest_result
     if not stored:
         st.info("اضغط Run Backtest لعرض النتائج.")
         return
     stats = stored["stats"]
+    st.caption(stored.get("data_line", ""))
     metric_values = [
         ("Total Trades", f"{stats['total_trades']:,}"),
         ("Win Rate", f"{stats['win_rate']:.1%}"),
