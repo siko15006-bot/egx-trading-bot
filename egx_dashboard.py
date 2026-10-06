@@ -3,6 +3,7 @@ from egx_lists import UNIVERSE, MANIFEST, DEMO_TICKERS, annotate, filter_univers
 
 import os
 import sqlite3
+from contextlib import closing
 from dataclasses import replace
 from datetime import datetime
 from io import BytesIO
@@ -25,6 +26,7 @@ import signal_engine as sigeng
 from dataclasses import asdict
 from paper_trading import (
     PaperTradeInput,
+    _db_path,
     add_paper_trade,
     campaign_progress,
     close_paper_trade,
@@ -1455,6 +1457,21 @@ def render_tab10() -> None:
     else:
         st.text(auto_sim.summary_line().splitlines()[-1])
         st.dataframe(sim.drop(columns=["id"]), width="stretch", hide_index=True)
+
+    # H3 forward test — منفصل عن auto-sim ودفتر الصفقات اليدوي (docs/research/H3_ai_score.md).
+    rtl_title("H3 AI Score — متابعة", 3)
+    st.caption("🧠 متابعة بدون فلوس: المستوى 1 معلّق، والحكم بعد 12 إعادة ترتيب بالتنفيذ الواقعي. مش إشارة مثبتة ومش نصيحة استثمار.")
+    try:
+        with closing(sqlite3.connect(_db_path())) as con:
+            h3 = pd.read_sql_query("SELECT * FROM h3_forward WHERE top10 = 1 ORDER BY rebalance DESC, rank", con)
+    except (sqlite3.Error, pd.errors.DatabaseError):
+        h3 = pd.DataFrame()
+    if h3.empty:
+        st.info("لسه مفيش إعادة ترتيب مسجلة.")
+    else:
+        latest = h3["rebalance"].max()
+        st.text(f"آخر إعادة ترتيب: {latest} | عدد إعادات الترتيب: {h3['rebalance'].nunique()}")
+        st.dataframe(h3[h3["rebalance"] == latest][["rank", "ticker", "score"]], width="stretch", hide_index=True)
 
 
 def main() -> None:

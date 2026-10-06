@@ -41,9 +41,9 @@ def download() -> None:
     print(f"requested {len(tickers)}, saved {saved}, yfinance {yf.__version__}")
 
 
-def load_panels() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+def load_panels(folder: Path = OUT) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     closes, values, real = {}, {}, {}
-    for f in sorted(OUT.glob("*.csv")):
+    for f in sorted(folder.glob("*.csv")):
         d = pd.read_csv(f, index_col="Date")
         filler = (d["Volume"] == 0) & (d["Open"] == d["High"]) & (d["High"] == d["Low"]) & (d["Low"] == d["Close"])
         d = d[~filler & d["Close"].gt(0)]

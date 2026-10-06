@@ -386,7 +386,7 @@ ACTIONS_CSV = Path(__file__).with_name("docs") / "corporate_actions.csv"
 # فولدرات أسعارها معدّلة بالتوزيعات أصلًا (auto_adjust=True) — إضافة التوزيعات عليها = حسابها مرتين.
 # كل واحد اتفحص بمقارنة COMI/EAST مع data_2019_2026_wf أو Yahoo مباشرة (KNOWN_ISSUES.md). أي فولدر معدّل جديد يتضاف هنا.
 KNOWN_ADJUSTED_FOLDERS = frozenset({"data_2019_2026_wf", "data_2022_2023", "data_2020_2021", "data_dividend_adjusted",
-                                    "data_momentum_2019"})
+                                    "data_momentum_2019", "data_h3_live"})
 KNOWN_UNADJUSTED_FOLDERS = frozenset({"data"})  # data_downloader.py: auto_adjust=False
 
 

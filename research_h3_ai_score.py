@@ -36,22 +36,22 @@ def feature_panels(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFra
     }
 
 
-def pools(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFrame) -> dict[int, pd.Index]:
-    """Same eligibility as research_h1_momentum.run, on the same rebalance grid."""
+def pools(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFrame, positions=None) -> dict[int, pd.Index]:
+    """Same eligibility as research_h1_momentum.run, on the same rebalance grid (or the given positions)."""
     real_count, recent = is_real.cumsum(), is_real.rolling(21).sum()
     liq = value.where(is_real).rolling(63, min_periods=1).median()
     out = {}
-    for p in range(147, len(close), 21):
+    for p in positions if positions is not None else range(147, len(close), 21):
         ok = (real_count.iloc[p] >= 147) & (recent.iloc[p] >= 15) & is_real.iloc[p]
         out[p] = liq.iloc[p][ok].dropna().nlargest(TOP_LIQ).index
     return out
 
 
-def dataset(close, value, is_real) -> pd.DataFrame:
+def dataset(close, value, is_real, positions=None) -> pd.DataFrame:
     px = close.ffill()
     feats = feature_panels(close, value, is_real)
     rows = []
-    for p, pool in pools(close, value, is_real).items():
+    for p, pool in pools(close, value, is_real, positions).items():
         if len(pool) < 10:
             continue
         x = pd.DataFrame({k: f.iloc[p][pool] for k, f in feats.items()})
