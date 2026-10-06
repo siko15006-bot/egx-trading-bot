@@ -318,10 +318,10 @@ def render_tab1() -> None:
     summary = pd.DataFrame(
         {
             "Ticker": data_map.keys(),
+            "Avg Value 20": liquidity,  # قبل التواريخ عشان يبان على شاشة الموبايل من غير سحب
             "Rows": [len(df) for df in data_map.values()],
             "From": [_display_index(df.index)[0].date() for df in data_map.values()],
             "To": [_display_index(df.index)[-1].date() for df in data_map.values()],
-            "Avg Value 20": liquidity,
         }
     )
     st.dataframe(
