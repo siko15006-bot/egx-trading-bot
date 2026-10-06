@@ -29,3 +29,5 @@ Thumbs.db
 .DS_Store
 *.log
 *.bak_*
+*.session
+*.session-journal
