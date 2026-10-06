@@ -1266,6 +1266,7 @@ def render_tab10() -> None:
     )
 
     closed_stats = performance_summary(trades)
+    st.caption("PnL لا يشمل التوزيعات: الأرقام أقل من الأداء الفعلي في الصفقات التي تعبر تاريخ الاستحقاق (ex-dividend).")
     open_count = int((trades["status"] == "OPEN").sum()) if not trades.empty else 0
     metric_cols = st.columns(4)
     metric_cols[0].metric("صفقات مفتوحة", open_count)
