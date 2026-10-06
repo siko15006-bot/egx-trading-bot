@@ -5,7 +5,7 @@ EGX technical-analysis, paper-trading, TradingView, Telegram, and analytics syst
 ## Main commands
 
 ```powershell
-cd C:\Users\ahmed\Documents\Codex\2026-10-04\1-sshuser-11110000-net-user-sshuser\outputs
+cd C:\Projects\EGX
 streamlit run egx_dashboard.py
 python data_downloader.py --data-folder ./data --limit 520 --period 2y
 python daily_runner.py --data-folder ./data --capital 100000 --notify --download
@@ -26,7 +26,7 @@ The script prints the laptop's current local IPv4 address and a URL such as `htt
 
 Security warning: mobile mode binds Streamlit to `0.0.0.0`, so other devices on the same local network may reach it. Use it only on a trusted private LAN. Do not expose, forward, or publish port 8501 on the Internet. The app does not add authentication.
 
-Windows Task Scheduler: `EGX_Daily_Runner` at 14:45 Cairo.
+Windows Task Scheduler: `EGX_Daily_Runner` at 14:45 Cairo, retried hourly until 19:45 (`--alert-after 19:30`). Recreate it with `powershell -ExecutionPolicy Bypass -File .\setup_scheduler.ps1`.
 
 Telegram Advisor Task Scheduler: `EGX_Telegram_Bot` starts at Windows sign-in. Recreate it with `powershell -ExecutionPolicy Bypass -File .\setup_telegram_bot_scheduler.ps1`.
 
