@@ -87,3 +87,11 @@ Known real sessions among `unexplained`: 2026-06-22, 2026-08-10. Whole week 2025
   on an ex-date exits at the lower unadjusted price and then receives the dividend in PnL. In the 2026-10-06 sample,
   5 of 346 trades exited by SL/TRAIL_SL on the ex-date itself (ARCC, BINV, EFID, ETRS, SAUD). The final PnL is right;
   a broker that auto-adjusts stop levels on ex-dates would give different results.
+
+## Strategy vs Buy & Hold — read with decision_report.md
+
+The dividend change did not move this. 4 Mirrors (Baseline) loses to B&H in every window tested:
+`data/` 2026 sample: beats B&H in 12/90 stocks. 2022-23: Baseline ret -0.05% at 3.3% exposure vs B&H +133% (EGP).
+Raw return vs B&H is not like-for-like (3% vs 100% invested; EGP returns inflated by devaluation — 2022-23 B&H is
++26.6% in USD). The fair comparison, D_hold_6 in EGP and USD over 3 periods, is in `decision_report.md`:
+rule output **ABANDON (confidence MED)** — D beats B&H on USD Sharpe in 1 of 3 periods. One window ≠ another regime.
