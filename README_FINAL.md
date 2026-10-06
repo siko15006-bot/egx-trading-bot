@@ -6,6 +6,15 @@ EGX technical-analysis, paper-trading, TradingView, Telegram, and analytics syst
 > **ABANDON (confidence MED)** in `decision_report.md`. Do not use its signals as the sole basis for trading.
 > Data caveats: `KNOWN_ISSUES.md`. Strategy research, if any, follows `docs/research/` pre-registration only.
 
+**Auto-simulation (`auto_sim.py`, table `auto_sim_trades`):** each daily run opens the top 2 BUY signals (RR_Net desc,
+then A→Z) and closes them on SL/TP from later bars (SL first, gaps fill at the Open, engine trailing rule, dividends
+included). It tests the technical path signal → SL/TP → close → PnL → Telegram/dashboard. It is **not** paper trading
+(the paper journal stays manual) and **not** a strategy evaluation.
+
+**After any merge that changes `egx_4_mirrors_v3.py` or other shared modules**, restart `EGX_Streamlit_Dashboard` and
+`EGX_Telegram_Bot`: Streamlit reruns reload only the dashboard script, not imported modules. Check
+`http://127.0.0.1:8501/_stcore/health` and `logs/telegram_advisor.log` before calling the deployment done.
+
 ## Main commands
 
 ```powershell

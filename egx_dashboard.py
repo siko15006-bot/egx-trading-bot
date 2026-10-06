@@ -38,6 +38,7 @@ from paper_trading import (
 )
 from telegram_notifier import is_configured as telegram_is_configured, send_telegram
 
+import auto_sim
 from egx_4_mirrors_v3 import (
     RiskConfig,
     ScreenConfig,
@@ -1440,6 +1441,20 @@ def render_tab10() -> None:
             px.bar(by_sector.sort_values("PnL", ascending=False), x="sector", y="PnL", color="PnL", color_continuous_scale="RdYlGn", title="Weekly PnL by sector"),
             width="stretch",
         )
+
+    # جدول منفصل عن دفتر الصفقات اليدوي — أرقامه اختبار مسار تقني، مش أداء استراتيجية.
+    rtl_title("Auto-simulation", 3)
+    st.caption(auto_sim.LABEL)
+    try:
+        sim = auto_sim.load()
+    except sqlite3.Error as exc:
+        st.error(f"Auto-sim database error: {exc}")
+        return
+    if sim.empty:
+        st.info("لا توجد صفقات auto-sim بعد؛ أول تشغيل يومي لـ daily_runner بيفتح أعلى إشارتين.")
+    else:
+        st.text(auto_sim.summary_line().splitlines()[-1])
+        st.dataframe(sim.drop(columns=["id"]), width="stretch", hide_index=True)
 
 
 def main() -> None:

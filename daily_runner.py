@@ -32,6 +32,7 @@ from telegram_notifier import send_telegram
 from data_health import DataHealthError, assess_daily_data, health_message
 from signal_engine import build_signals
 from validate_tv_signals import init_db
+import auto_sim
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -245,6 +246,14 @@ def run_daily(args: argparse.Namespace) -> int:
         stats = compute_stats(alerts, outcomes)
         patterns = detect_patterns(outcomes)
 
+        auto_line = ""
+        if not args.dry_run:   # auto-sim writes auto_sim_trades; a failure here must not block the daily report
+            try:
+                sim = auto_sim.run(data_map, signals, RiskConfig(capital=args.capital), db_path)
+                LOGGER.info("Auto-sim: closed=%d opened=%s as_of=%s", sim["closed"], sim["opened"], sim["as_of"])
+                auto_line = "\n\n" + auto_sim.summary_line(db_path)
+            except Exception:
+                LOGGER.exception("Auto-sim step failed")
         buy_tickers = sorted(signals.loc[signals["Status"] == "BUY", "Ticker"].astype(str).tolist()) if not signals.empty else []
         previous = set() if args.dry_run else _reported_tickers(db_path, report_date)   # _reported_tickers بيعمل CREATE + commit
         new_tickers = sorted(set(buy_tickers) - previous)
@@ -254,7 +263,7 @@ def run_daily(args: argparse.Namespace) -> int:
             if args.notify and not args.no_telegram:
                 health["telegram_delivery"] = _notify_once(
                     report_date, _daily_message(now.strftime("%Y-%m-%d"), new_tickers, stats,
-                                                as_of=unified.as_of, buy_count=len(unified.buy), watch_count=len(unified.watch)),
+                                                as_of=unified.as_of, buy_count=len(unified.buy), watch_count=len(unified.watch)) + auto_line,
                 )
             _store_report(db_path, report_date, report_path, buy_tickers, stats, patterns)
         else:
