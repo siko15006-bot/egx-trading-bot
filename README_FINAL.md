@@ -1,6 +1,10 @@
 # EGX Trading System v3
 
-EGX technical-analysis, paper-trading, TradingView, Telegram, and analytics system. The project uses the v3 engine and a 35-stock Yahoo Finance universe.
+EGX technical-analysis, paper-trading, TradingView, Telegram, and analytics system. The project uses the v3 engine and a 90-stock Yahoo Finance universe (`egx_universe.json` v90-20261005).
+
+> **Status (2026-10-06): monitoring and alerting tool, not a trading strategy.** The 4 Mirrors strategy was tested and ruled
+> **ABANDON (confidence MED)** in `decision_report.md`. Do not use its signals as the sole basis for trading.
+> Data caveats: `KNOWN_ISSUES.md`. Strategy research, if any, follows `docs/research/` pre-registration only.
 
 ## Main commands
 
