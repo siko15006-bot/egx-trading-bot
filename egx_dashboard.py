@@ -212,6 +212,17 @@ def _apply_theme(dark: bool) -> None:
             border-radius: 6px;
         }
         div[dir="rtl"] { text-align: right; }
+        [data-testid="stAlert"] [data-testid="stMarkdownContainer"] {
+            direction: rtl;
+            text-align: right;
+            unicode-bidi: plaintext;
+        }
+        [data-testid="stAlert"] code,
+        [data-testid="stAlert"] pre {
+            direction: ltr;
+            text-align: left;
+            unicode-bidi: embed;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -751,18 +762,10 @@ def _demo_analytics_frames(data_map: Mapping[str, pd.DataFrame]) -> tuple[pd.Dat
     return pd.DataFrame(alerts), pd.DataFrame(outcomes)
 
 
-# يقرأ بيانات التحليلات أو يستخدم بيانات Demo المؤقتة عند فراغ القاعدة.
+# يقرأ بيانات التحليلات الحقيقية فقط؛ أخطاء القراءة يعالجها التاب.
 def _analytics_frames(days: int) -> tuple[pd.DataFrame, pd.DataFrame, bool]:
-    try:
-        alerts = load_alerts(days)
-        outcomes = load_outcomes(days)
-    except (sqlite3.Error, OSError, ValueError) as exc:
-        st.error(f"Analytics database error: {exc}")
-        alerts, outcomes = pd.DataFrame(), pd.DataFrame()
-    data_map: Mapping[str, pd.DataFrame] = st.session_state.data_map
-    if alerts.empty and data_map:
-        demo_alerts, demo_outcomes = _demo_analytics_frames(data_map)
-        return demo_alerts, demo_outcomes, True
+    alerts = load_alerts(days)
+    outcomes = load_outcomes(days)
     return alerts, outcomes, False
 
 
@@ -787,9 +790,17 @@ def _filter_analytics_dates(
 # يعرض إشارات TradingView الحية ونتائج تقييمها.
 def render_tab6() -> None:
     rtl_title("إشارات TradingView الحيّة")
-    alerts, outcomes, demo_mode = _analytics_frames(30)
-    if demo_mode:
-        st.info("تعرض هذه الصفحة بيانات Demo مؤقتة لأن قاعدة الإشارات فارغة.")
+    try:
+        alerts, outcomes, _ = _analytics_frames(30)
+    except (sqlite3.Error, pd.errors.DatabaseError, OSError, ValueError) as exc:
+        st.error(f"Analytics database error: {exc}")
+        return
+    if not alerts.empty and not {"id", "timestamp", "ticker", "entry", "sl", "tp", "adx", "atr_pct", "status", "sector"}.issubset(alerts.columns):
+        st.error("Analytics data structure error: missing required signal columns")
+        return
+    if not outcomes.empty and not {"alert_id", "outcome", "pnl_pct"}.issubset(outcomes.columns):
+        st.error("Analytics data structure error: missing alert_id, outcome or pnl_pct")
+        return
 
     today = pd.Timestamp.now(tz=CAIRO_TZ).date()
     filter_cols = st.columns([2, 2, 2, 1, 1])
@@ -810,24 +821,31 @@ def render_tab6() -> None:
         if not outcomes.empty:
             outcomes = outcomes[outcomes["alert_id"].isin(alerts["id"])]
 
-    stats = compute_stats(alerts, outcomes)
-    metric_cols = st.columns(4)
-    metric_cols[0].metric("إجمالي الإشارات", stats["total_alerts"])
-    metric_cols[1].metric("Win Rate", f"{stats['win_rate']:.1f}%")
-    metric_cols[2].metric("Profit Factor", "∞" if stats["profit_factor"] == float("inf") else f"{stats['profit_factor']:.2f}")
-    metric_cols[3].metric("Expectancy", f"{stats['expectancy']:.2f}%")
+    if alerts.empty:
+        st.info("لا توجد إشارات تطابق الفلاتر الحالية.")
+        return
+    closed = outcomes[outcomes["outcome"].isin(["WIN", "LOSS"])].copy() if not outcomes.empty else pd.DataFrame()
+    if closed.empty:
+        st.warning("الإشارات معروضة، ولكن لا توجد نتائج مغلقة (WIN/LOSS) بعد لحساب الأداء.")
+    else:
+        stats = compute_stats(alerts, closed)
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("إجمالي الإشارات", stats["total_alerts"])
+        metric_cols[1].metric("Win Rate", f"{stats['win_rate']:.1f}%")
+        metric_cols[2].metric("Profit Factor", "∞" if stats["profit_factor"] == float("inf") else f"{stats['profit_factor']:.2f}")
+        metric_cols[3].metric("Expectancy", f"{stats['expectancy']:.2f}%")
 
     actions = st.columns(3)
     if actions[0].button("🔄 تحديث", key="refresh_live"):
         st.rerun()
-    if actions[1].button("🧮 تقييم الإشارات المعلقة", key="evaluate_live", disabled=demo_mode):
+    if actions[1].button("🧮 تقييم الإشارات المعلقة", key="evaluate_live"):
         with st.spinner("Evaluating pending alerts..."):
             folder = os.getenv("DATA_FOLDER", str(Path(__file__).with_name("data")))
             evaluate_pending_alerts(folder, lookback_days=30)
         st.rerun()
 
     merged = alerts.merge(
-        outcomes[["alert_id", "pnl_pct"]] if not outcomes.empty else pd.DataFrame(columns=["alert_id", "pnl_pct"]),
+        closed[["alert_id", "pnl_pct"]] if not closed.empty else pd.DataFrame(columns=["alert_id", "pnl_pct"]),
         left_on="id",
         right_on="alert_id",
         how="left",
@@ -838,9 +856,12 @@ def render_tab6() -> None:
     display = merged[["timestamp", "ticker", "entry", "sl", "tp", "adx", "atr_pct", "status", "sector", "pnl_pct"]].copy()
     display.columns = ["Timestamp", "Ticker", "Entry", "SL", "TP", "ADX", "ATR%", "Status", "Sector", "PnL%"]
     display["Timestamp"] = pd.to_datetime(display["Timestamp"], utc=True).dt.tz_convert(CAIRO_TZ)
+    # نسخة للجدول فقط؛ القيم الأصلية محفوظة للتصدير والرسم.
+    table_display = display.copy()
+    table_display["PnL%"] = table_display["PnL%"].apply(lambda value: "" if pd.isna(value) else f"{value:+.2f}")
     status_colors = {"CONFIRMED": "#16794b", "MISMATCH": "#b7791f", "REJECT": "#6b7280"}
-    styled = display.style.map(lambda value: f"background-color:{status_colors.get(value, '#6b7280')};color:white", subset=["Status"])
-    styled = styled.map(lambda value: "" if pd.isna(value) else ("color:#16a34a" if value >= 0 else "color:#dc2626"), subset=["PnL%"])
+    styled = table_display.style.map(lambda value: f"background-color:{status_colors.get(value, '#6b7280')};color:white", subset=["Status"])
+    styled = styled.map(lambda value: "" if value == "" or pd.isna(value) else ("color:#16a34a" if float(value) >= 0 else "color:#dc2626"), subset=["PnL%"])
     st.dataframe(styled, width="stretch", hide_index=True)
     actions[2].download_button("📥 تصدير CSV", display.to_csv(index=False).encode("utf-8-sig"), "tv_live_signals.csv", "text/csv")
 
@@ -859,13 +880,32 @@ def _rates_frame(values: Mapping[str, float], label: str) -> pd.DataFrame:
 # يعرض لوحة التحليلات التاريخية والأنماط المكتشفة.
 def render_tab7() -> None:
     rtl_title("تحليلات الأداء (Analytics)")
-    alerts, outcomes, demo_mode = _analytics_frames(90)
-    if demo_mode:
-        st.info("Analytics Demo mode: النتائج مؤقتة ولا تُكتب في قاعدة البيانات.")
+    try:
+        alerts, outcomes, _ = _analytics_frames(90)
+    except (sqlite3.Error, pd.errors.DatabaseError, OSError, ValueError) as exc:
+        st.error(f"Analytics database error: {exc}")
+        return
+    if not alerts.empty and not {"id", "timestamp", "ticker", "adx", "atr_pct", "status", "sector", "weekday", "hour"}.issubset(alerts.columns):
+        st.error("Analytics data structure error: missing required signal columns")
+        return
+    if not outcomes.empty and not {"alert_id", "outcome", "pnl_pct"}.issubset(outcomes.columns):
+        st.error("Analytics data structure error: missing alert_id, outcome or pnl_pct")
+        return
     today = pd.Timestamp.now(tz=CAIRO_TZ).date()
     date_range = st.date_input("Date range", (today - pd.Timedelta(days=90), today), key="analytics_dates")
     alerts, outcomes = _filter_analytics_dates(alerts, outcomes, date_range)
-    stats = compute_stats(alerts, outcomes)
+    if alerts.empty:
+        st.info("لا توجد إشارات تطابق الفلاتر الحالية.")
+        return
+    if outcomes.empty:
+        st.info("لا توجد نتائج كافية لحساب إحصائيات الأداء. يرجى تشغيل الإشارات وانتظار إغلاق الصفقات.")
+        return
+    closed = outcomes[outcomes["outcome"].isin(["WIN", "LOSS"])].copy()
+    closed = closed[closed["alert_id"].isin(alerts["id"])]
+    if closed.empty:
+        st.info("لا توجد نتائج مغلقة (WIN/LOSS) تطابق الإشارات بعد الفلاتر الحالية. الأداء غير متاح.")
+        return
+    stats = compute_stats(alerts, closed)
 
     rtl_title("الأداء الإجمالي", 3)
     values = [
@@ -878,13 +918,14 @@ def render_tab7() -> None:
         ("Max Wins", stats["consecutive_wins"]),
         ("Max Losses", stats["consecutive_losses"]),
     ]
-    for column, (label, value) in zip(st.columns(8), values):
+    row1 = st.columns(4)
+    row2 = st.columns(4)
+    for column, (label, value) in zip(row1 + row2, values):
         column.metric(label, value)
 
     sector_table = _rates_frame(stats["win_rate_by_sector"], "Sector")
     weekday_table = _rates_frame(stats["win_rate_by_weekday"], "Weekday")
     hour_rates = {}
-    closed = outcomes[outcomes.get("outcome", pd.Series(dtype=str)).isin(["WIN", "LOSS"])].copy()
     if not closed.empty and "hour" in closed:
         hour_rates = (closed.groupby("hour")["outcome"].apply(lambda values: float((values == "WIN").mean() * 100))).to_dict()
     hour_table = _rates_frame(hour_rates, "Hour")
@@ -921,7 +962,7 @@ def render_tab7() -> None:
 
     rtl_title("الأنماط المكتشفة", 3)
     icons = {"HIGH": "💡", "MED": "⚠️", "LOW": "ℹ️"}
-    patterns = detect_patterns(outcomes)
+    patterns = detect_patterns(closed)
     if not patterns:
         st.info("لا توجد عينة كافية لاكتشاف أنماط.")
     for pattern in patterns:
@@ -929,7 +970,7 @@ def render_tab7() -> None:
 
     export_cols = st.columns(5)
     report_path = Path(__file__).with_name("analytics_report.xlsx")
-    if export_cols[0].button("📊 تصدير تقرير Excel", key="export_analytics_excel", disabled=demo_mode):
+    if export_cols[0].button("📊 تصدير تقرير Excel", key="export_analytics_excel"):
         with st.spinner("Building Excel report..."):
             export_analytics_report(report_path)
             st.session_state.analytics_report = report_path.read_bytes()
