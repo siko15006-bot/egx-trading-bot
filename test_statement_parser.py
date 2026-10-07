@@ -87,8 +87,8 @@ def test_unknown_rows_stop_the_parser() -> None:
         _parse("1/10/2026 توزيعات كوبون 5 105", closing="105")
     with pytest.raises(ValueError, match="fund 'xyz'"):
         _parse("1/10/2026 بيع xyz (جنيه (1@5 5 105", closing="105")
-    with pytest.raises(ValueError, match="هيبكو"):   # listed as unresolved: stop and ask, never guess
-        _parse("1/10/2026 شراء هيبكو للاستثمارات التجارية والتنمية العقارية 10.0000@1) ( -13.01 86.99", closing="86.99")
+    with pytest.raises(ValueError, match="شركة وهمية"):   # unknown company: stop and ask, never guess
+        _parse("1/10/2026 شراء شركة وهمية للتجارة 10.0000@1) ( -13.01 86.99", closing="86.99")
     with pytest.raises(ValueError, match="does not reconcile"):
         _parse("1/10/2026 ايداع / بنك بنك مصر 10 111", closing="111")
 

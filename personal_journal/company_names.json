@@ -1,5 +1,5 @@
 {
-  "_note": "Thndr statement name (Arabic, as printed) -> ticker. Each company verified: the statement price lies inside that day's Low-High (data/, or Yahoo for tickers outside data/); ORAS by the ISIN on Thndr's own invoice (EGS95001C011, Yahoo's ORAS prices are broken). Unknown name -> parser error, never a guess.",
+  "_note": "Thndr statement name (Arabic, as printed) -> ticker. Each company verified: the statement price lies inside that day's Low-High (data/, or Yahoo for tickers outside data/); ORAS by the ISIN on Thndr's own invoice (EGS95001C011, Yahoo's ORAS prices are broken). Unknown name -> parser error, never a guess. HBCO, EGREF (exchange-traded fund certificate: a fill with fees, so under companies, not funds) and EHD confirmed by Ahmed from the Thndr app 2026-10-07 (EHD not yet seen in a statement).",
   "companies": {
     "القاهره للاستثمار والتنميه العقاريه(سيرا للتعليم)": "CIRA.CA",
     "مصرف ابوظبى الاسلامي - مصر": "ADIB.CA",
@@ -15,7 +15,10 @@
     "مينا فارم للأدوية والصناعات الكيماوية": "MIPH.CA",
     "ابن سينا فارما": "ISPH.CA",
     "المنصوره للدواجن": "MPCO.CA",
-    "الصناعات الهندسية المعمارية للانشاء والتعمير - ايكون": "ENGC.CA"
+    "الصناعات الهندسية المعمارية للانشاء والتعمير - ايكون": "ENGC.CA",
+    "هيبكو للاستثمارات التجارية والتنمية العقارية": "HBCO.CA",
+    "وثائق صندوق المصريين للاستثمار العقارى": "EGREF.CA",
+    "المصرية للسكان والتنمية والتعمير": "EHD.CA"
   },
   "funds": {
     "thndrsavings": "Thndr Savings",
@@ -24,8 +27,5 @@
     "BMM": "BMM",
     "ABR": "ABR"
   },
-  "_unresolved": {
-    "هيبكو للاستثمارات التجارية والتنمية العقارية": "ticker not found on Yahoo — Ahmed to confirm from the Thndr app",
-    "وثائق صندوق المصريين للاستثمار العقارى": "exchange-traded fund certificate; Yahoo lists EGS694B1C017.CA with no prices — Ahmed to confirm"
-  }
+  "_unresolved": {}
 }
