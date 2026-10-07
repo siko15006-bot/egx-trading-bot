@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS imports (
     imported_at TEXT NOT NULL,
     period_from TEXT,
     period_to TEXT,
-    row_count INTEGER NOT NULL
+    row_count INTEGER NOT NULL,
+    overlaps_imports TEXT          -- ids of earlier imports whose period overlaps (warning, Ahmed confirms; not a block)
 );
 CREATE TABLE IF NOT EXISTS raw_rows (           -- untouched copy of every statement row (audit trail)
     import_id INTEGER NOT NULL REFERENCES imports(id),
@@ -35,18 +36,39 @@ CREATE TABLE IF NOT EXISTS fills (               -- one row per executed transac
     brokerage REAL, egx REAL, mcdr REAL, fra REAL, insurance REAL, stamp REAL, other_fees REAL,
     total_fees REAL NOT NULL,
     order_ref TEXT,
+    review_flag TEXT CHECK (review_flag IN ('POSSIBLE_DUPLICATE')),  -- set when the statement period overlaps an earlier import
     -- identity = "row X of statement Y": two real executions can share day, ticker, qty and price, so the
     -- trade's own fields must never be a unique key. Re-importing a file is blocked by imports.sha256 instead.
     UNIQUE (import_id, row_no)
 );
+-- Event types: BUY/SELL → fills; POSITION → position_events; CASH → cash_events. A position event changes the share
+-- count without a trade at a price, so it is never a BUY lot (a bonus lowers the average cost, it is not a purchase).
+CREATE TABLE IF NOT EXISTS position_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    import_id INTEGER NOT NULL REFERENCES imports(id),
+    row_no INTEGER NOT NULL,
+    ts_cairo TEXT NOT NULL,
+    ticker TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('transfer_in', 'transfer_out', 'bonus_shares', 'subscription_allocation', 'split')),
+    qty INTEGER CHECK (qty IS NULL OR qty > 0),          -- shares in/out; NULL for a pure ratio event (split)
+    ratio_num INTEGER, ratio_den INTEGER,                 -- split / bonus ratio when the statement gives one
+    cost_basis REAL,                                      -- NULL = unknown (a transfer's cost is NOT zero)
+    review_flag TEXT CHECK (review_flag IN ('POSSIBLE_DUPLICATE')),
+    UNIQUE (import_id, row_no),
+    -- COALESCE: in SQL a NULL comparison is NULL and a NULL CHECK passes, so a row with neither field would slip in
+    CHECK (qty IS NOT NULL OR (COALESCE(ratio_num, 0) > 0 AND COALESCE(ratio_den, 0) > 0))
+);
 CREATE TABLE IF NOT EXISTS cash_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     import_id INTEGER NOT NULL REFERENCES imports(id),
+    row_no INTEGER NOT NULL,
     ts_cairo TEXT NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('dividend', 'stamp_refund', 'commission_kickback', 'custody_fee',
                                        'subscription', 'deposit', 'withdrawal', 'other')),
     ticker TEXT,
-    amount REAL NOT NULL
+    amount REAL NOT NULL,
+    review_flag TEXT CHECK (review_flag IN ('POSSIBLE_DUPLICATE')),
+    UNIQUE (import_id, row_no)
 );
 CREATE TABLE IF NOT EXISTS round_trips (         -- derived by FIFO matching; rebuilt, never edited
     id INTEGER PRIMARY KEY AUTOINCREMENT,

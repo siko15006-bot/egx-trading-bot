@@ -18,9 +18,14 @@ def parse_rows(path: Path, fmt: Format) -> list[dict[str, Any]]:
     raise NotImplementedError("waiting for a real Thndr statement")
 
 
-def validate_balance(fills: list[dict[str, Any]], holdings: dict[str, int] | None = None) -> list[str]:
-    """Problems found before writing: qty×price vs gross, fee recomputation vs fees_config (> 0.01 EGP),
-    final holdings vs the app, sells larger than the open position. Empty list = OK."""
+def validate_balance(rows: list[dict[str, Any]], holdings: dict[str, int] | None = None,
+                     *, earlier_periods: list[tuple[int, str, str]] | None = None) -> list[str]:
+    """Problems/warnings found before writing, each prefixed with a stable tag:
+    OVERSELL (always checked on the rows alone, independent of `holdings`), GROSS_MISMATCH (qty×price vs gross
+    > 0.01 EGP), FEE_DIFF (vs fees_config), HOLDINGS_MISMATCH (only when `holdings` is given) and
+    PERIOD_OVERLAP (a warning: earlier import ids whose (from, to) overlaps → rows get review_flag
+    POSSIBLE_DUPLICATE and Ahmed confirms; overlapping imports are allowed so older statements can be added).
+    Position rows (transfer/bonus/IPO/split) change share counts for OVERSELL but are never BUY lots."""
     raise NotImplementedError("waiting for a real Thndr statement")
 
 
