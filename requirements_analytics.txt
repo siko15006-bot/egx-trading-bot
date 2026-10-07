@@ -10,3 +10,4 @@ scipy>=1.17
 scikit-learn>=1.8
 telethon>=1.44
 pytest>=9.0
+pdfplumber>=0.11,<0.12

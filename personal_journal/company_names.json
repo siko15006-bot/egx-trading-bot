@@ -1,0 +1,8 @@
+{
+  "_note": "Thndr statement name (Arabic, as printed) -> ticker. Each entry verified: the statement price lies inside that day's Low-High in data/. Unknown name -> parser error, never a guess.",
+  "القاهره للاستثمار والتنميه العقاريه(سيرا للتعليم)": "CIRA.CA",
+  "مصرف ابوظبى الاسلامي - مصر": "ADIB.CA",
+  "الشركة المصرية للاتصالات": "ETEL.CA",
+  "النيل للادوية والصناعات الكيماوية": "NIPH.CA",
+  "البنك التجاري الدولي (مصر)": "COMI.CA"
+}
