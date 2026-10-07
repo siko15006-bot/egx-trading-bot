@@ -100,7 +100,7 @@ def _trend_entry(data: pd.DataFrame, i: int, sc: Scenario) -> Optional[dict[str,
     shares = _shares(entry, stop, row, sc.risk)
     if shares <= 0:
         return None
-    risk_egp = (entry - stop) * shares + sc.risk.round_trip_fee_pct * shares * (entry + stop)
+    risk_egp = (entry - stop) * shares + eng.trade_fees(entry, stop, shares, sc.risk)
     return {"entry": entry, "stop": stop, "tp": float("inf"), "atr": float(row["ATR"]), "shares": shares,
             "risk_egp": risk_egp, "position_value": shares * entry}
 
@@ -118,7 +118,7 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
     start = _start(data, start_date)
     i = start
     n = len(data)
-    while i < n:
+    while i < n - 1:
         plan = entry_fn(data, i, sc)
         if plan is None:
             i += 1
@@ -126,7 +126,7 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
         entry, initial_stop, tp, atr = plan["entry"], plan["stop"], plan["tp"], plan["atr"]
         stop = initial_stop
         exit_price, exit_index, reason = float(data["Close"].iloc[-1]), n - 1, "END"
-        first = i if mode == "engine" else i + 1   # engine = منطق المحرك القديم (للتحقق فقط)
+        first = i + 1   # Both modes ignore the already-completed signal bar.
         highest_close = entry
         for j in range(first, n):
             row = data.iloc[j]
@@ -160,7 +160,8 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
                 break
         if mode == "realistic" and reason != "END":
             assert exit_index > i, "look-ahead: exit on the entry bar"
-        pnl = eng.net_trade_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk, eng.dividends_between(data, i, exit_index))
+        pnl = eng.net_trade_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk, eng.dividends_between(data, i, exit_index),
+                                same_session=eng.same_session(data.index[i], data.index[exit_index]))
         equity += pnl
         daily_pnl.iloc[exit_index] += pnl
         exposure.iloc[i: exit_index + 1] += plan["position_value"] / capital
@@ -182,7 +183,7 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
     """Signal-Based Buy & Hold: دخول عند إغلاق يوم إشارة C، خروج بإغلاق < EMA50 أو وقف −15% (فجوة → الافتتاح).
     لا Trailing ولا هدف. الخروج يتفحص قبل الدخول في نفس اليوم، فأول خروج ممكن = اليوم التالي للدخول."""
     sc = SCENARIOS["C_trend"]
-    risk, fee = sc.risk, sc.risk.round_trip_fee_pct
+    risk = sc.risk
     ind = {t: eng.calculate_indicators(df) for t, df in data_map.items()}
     signals: dict[pd.Timestamp, list[tuple[float, str]]] = {}
     for t, d in ind.items():
@@ -199,8 +200,9 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
         p = pos.pop(t)
         d = ind[t]
         pnl = eng.net_trade_pnl(p["entry"], px, p["shares"], risk,
-                                eng.dividends_between(d, d.index.get_loc(p["ts"]), d.index.get_loc(ts)))
-        cash += p["shares"] * p["entry"] * (1 + fee / 2) + pnl   # يرجّع التكلفة المدفوعة + صافي الربح
+                                eng.dividends_between(d, d.index.get_loc(p["ts"]), d.index.get_loc(ts)),
+                                same_session=eng.same_session(p['ts'], ts))
+        cash += p['cost'] + pnl
         value = p["shares"] * p["entry"]
         trades.append({"ticker": t, "entry_date": p["ts"], "exit_date": ts, "entry": p["entry"], "exit": px, "shares": p["shares"],
                        "position_value": value, "pnl": pnl, "R": pnl / (value * sl_pct), "pnl_pct_pos": pnl / value * 100,
@@ -229,12 +231,17 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
                 continue
             row = ind[t].loc[ts]
             px = float(row["Close"])
-            budget = min(pos_pct * equity, cash / (1 + fee / 2))
+            budget = min(pos_pct * equity, cash)
             shares = int(min(budget // px, floor(risk.max_avg_volume_pct * float(row["Volume_SMA20"]))))
             if shares <= 0:
                 continue
-            cash -= shares * px * (1 + fee / 2)
-            pos[t] = {"entry": px, "stop": px * (1 - sl_pct), "shares": shares, "ts": ts}
+            while shares > 0 and shares * px + eng.entry_order_fee(shares * px, risk) > cash:
+                shares -= 1
+            if shares <= 0:
+                continue
+            cost = shares * px + eng.entry_order_fee(shares * px, risk)
+            cash -= cost
+            pos[t] = {"entry": px, "stop": px * (1 - sl_pct), "shares": shares, "ts": ts, 'cost': cost}
         held = sum(p["shares"] * last_close[t] for t, p in pos.items())
         curve[ts], invested[ts] = cash + held, held / (cash + held)
     for t in list(pos):   # مراكز مفتوحة في النهاية → تقييم على آخر إغلاق (END)

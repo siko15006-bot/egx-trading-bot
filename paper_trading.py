@@ -14,11 +14,10 @@ import numpy as np
 import pandas as pd
 from dotenv import load_dotenv
 
-from egx_4_mirrors_v3 import SECTOR_MAP
+from egx_4_mirrors_v3 import SECTOR_MAP, RiskConfig, trade_fees, net_trade_pnl, same_session
 
 
 CAIRO_TZ = ZoneInfo("Africa/Cairo")
-ROUND_TRIP_COMMISSION = 0.003
 CAPITAL_GAINS_TAX = 0.10
 PAPER_TARGET_DAYS = 183
 PAPER_TARGET_TRADES = 15
@@ -167,6 +166,7 @@ def close_paper_trade(
     exit_time: datetime,
     exit_price: float,
     db_path: str | os.PathLike[str] | None = None,
+    *, risk: RiskConfig | None = None, entry_fills=None, exit_fills=None,
 ) -> dict[str, float | str]:
     if exit_price <= 0:
         raise ValueError("Exit price must be positive")
@@ -183,11 +183,15 @@ def close_paper_trade(
 
         entry_value = float(row["entry"]) * int(row["shares"])
         exit_value = float(exit_price) * int(row["shares"])
-        commission = (entry_value + exit_value) * (ROUND_TRIP_COMMISSION / 2)
+        risk = risk or RiskConfig(capital_gains_tax_pct=CAPITAL_GAINS_TAX)
+        t0 = same_session(row['entry_time'], exit_time)
+        commission = trade_fees(float(row['entry']), float(exit_price), int(row['shares']), risk,
+                                same_session=t0, entry_fills=entry_fills, exit_fills=exit_fills)
         gross = exit_value - entry_value
         taxable_profit = max(gross - commission, 0.0)
-        tax = taxable_profit * CAPITAL_GAINS_TAX
-        pnl = gross - commission - tax
+        tax = taxable_profit * risk.capital_gains_tax_pct
+        pnl = net_trade_pnl(float(row['entry']), float(exit_price), int(row['shares']), risk,
+                            same_session=t0, entry_fills=entry_fills, exit_fills=exit_fills)
         pnl_pct = pnl / entry_value * 100
         initial_risk = (float(row["entry"]) - float(row["stop_loss"])) * int(row["shares"])
         r_multiple = pnl / initial_risk if initial_risk > 0 else np.nan

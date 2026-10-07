@@ -82,7 +82,8 @@ def update_open(data_map: Mapping[str, pd.DataFrame], risk: eng.RiskConfig, db_p
             date, price, reason, j = exit_
             i = [_day(ts) for ts in data.index].index(sdate)
             div_ps = eng.dividends_between(data, i, j)
-            pnl = eng.net_trade_pnl(entry, price, shares, risk, div_ps)
+            pnl = eng.net_trade_pnl(entry, price, shares, risk, div_ps,
+                                    same_session=eng.same_session(sdate, date))
             con.execute("UPDATE auto_sim_trades SET status='CLOSED', stop=?, exit_date=?, exit_price=?, exit_reason=?, "
                         "div_ps=?, pnl_egp=?, pnl_pct=? WHERE id=?",
                         (stop, date, price, reason, div_ps, pnl, pnl / (entry * shares) * 100, tid))

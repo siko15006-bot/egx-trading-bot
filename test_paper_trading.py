@@ -52,7 +52,7 @@ class PaperTradingTest(unittest.TestCase):
             self.assertEqual(trades.iloc[0]["status"], "CLOSED")
             self.assertEqual(len(weekly), 1)
             self.assertEqual(summary["trades"], 1)
-            self.assertTrue(math.isclose(float(result["pnl_egp"]), 87.165, abs_tol=1e-6))
+            self.assertTrue(math.isclose(float(result["pnl_egp"]), 81.2925, abs_tol=1e-6))
             campaign = campaign_progress(db_path)
             day_ten = campaign_progress(db_path, campaign["start_date"] + timedelta(days=9))
             self.assertEqual(day_ten["elapsed_days"], 10)

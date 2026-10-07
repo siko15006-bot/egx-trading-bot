@@ -1,5 +1,6 @@
 from __future__ import annotations
 from egx_lists import filter_universe, annotate, SECTOR_MAP as UNIVERSE_SECTORS
+from fees_config import FeesConfig, THNDR_FEES, order_fees, round_trip_fees
 
 import argparse
 from dataclasses import dataclass
@@ -90,7 +91,9 @@ class RiskConfig:
     risk_pct: float = 0.01
     atr_sl_mult: float = 1.5
     reward_risk: float = 2.0
-    round_trip_fee_pct: float = 0.003
+    # Explicit legacy per-side override, for controlled comparisons only.
+    round_trip_fee_pct: float | None = None
+    fees: FeesConfig = THNDR_FEES
     capital_gains_tax_pct: float = 0.10
     dividend_tax_pct: float = 0.10  # withheld at source on cash dividends, separate from capital gains tax
     max_position_pct: float = 0.20
@@ -297,8 +300,8 @@ def _net_reward_risk(
 ) -> tuple[float, float, float]:
     gross_loss = (entry - stop_loss) * shares
     gross_profit = (take_profit - entry) * shares
-    loss_fees = risk_cfg.round_trip_fee_pct * shares * (entry + stop_loss)
-    profit_fees = risk_cfg.round_trip_fee_pct * shares * (entry + take_profit)
+    loss_fees = trade_fees(entry, stop_loss, shares, risk_cfg)
+    profit_fees = trade_fees(entry, take_profit, shares, risk_cfg)
     net_loss = gross_loss + loss_fees
     pre_tax_profit = gross_profit - profit_fees
     tax = max(pre_tax_profit, 0) * risk_cfg.capital_gains_tax_pct
@@ -336,12 +339,24 @@ def build_trade_plan(
 
     risk_egp, reward_egp, rr_net = _net_reward_risk(entry, stop_loss, take_profit, shares, risk_cfg)
     if rr_net < risk_cfg.reward_risk:
-        fee = risk_cfg.round_trip_fee_pct
         after_tax = 1 - risk_cfg.capital_gains_tax_pct
-        required_net_per_share = risk_cfg.reward_risk * risk_egp / shares
-        take_profit = (
-            required_net_per_share / after_tax + entry * (1 + fee)
-        ) / (1 - fee)
+        if after_tax <= 0:
+            raise ValueError('Capital gains tax must be below 100%')
+        required_gross = risk_cfg.reward_risk * risk_egp / after_tax
+        low, high = take_profit, max(take_profit, entry * 2)
+        for _ in range(128):
+            if (high - entry) * shares - trade_fees(entry, high, shares, risk_cfg) >= required_gross:
+                break
+            high *= 2
+        else:
+            raise ValueError('Fee configuration cannot produce the requested net reward')
+        for _ in range(64):
+            middle = (low + high) / 2
+            if (middle - entry) * shares - trade_fees(entry, middle, shares, risk_cfg) < required_gross:
+                low = middle
+            else:
+                high = middle
+        take_profit = high
         risk_egp, reward_egp, rr_net = _net_reward_risk(
             entry, stop_loss, take_profit, shares, risk_cfg
         )
@@ -357,7 +372,7 @@ def build_trade_plan(
         reward_egp=reward_egp,
         rr_net=rr_net,
         position_value=shares * entry,
-        notes=f"fees={risk_cfg.round_trip_fee_pct:.2%}, tax={risk_cfg.capital_gains_tax_pct:.0%}",
+        notes=f"fees={'Thndr current-tariff scenario' if risk_cfg.round_trip_fee_pct is None else 'legacy per-side override'}, tax assumption={risk_cfg.capital_gains_tax_pct:.0%}",
     )
 
 
@@ -430,8 +445,32 @@ def dividends_between(data: pd.DataFrame, i: int, j: int) -> float:
 
 # صافي ربح صفقة: فرق السعر − العمولة − ضريبة الأرباح الرأسمالية + صافي التوزيعات بعد الاستقطاع.
 # مشتركة بين المحرك و backtest_optimizer عشان الاتنين يفضلوا متطابقين.
-def net_trade_pnl(entry: float, exit_price: float, shares: int, risk: RiskConfig, dividends_per_share: float = 0.0) -> float:
-    pre_tax = (exit_price - entry) * shares - risk.round_trip_fee_pct * shares * (entry + exit_price)
+def trade_fees(entry, exit_price, shares, risk, *, same_session=False, entry_fills=None, exit_fills=None):
+    if risk.round_trip_fee_pct is not None:
+        return risk.round_trip_fee_pct * shares * (entry + exit_price)
+    return round_trip_fees(entry * shares, exit_price * shares, same_session=same_session,
+                           entry_fills=entry_fills, exit_fills=exit_fills, config=risk.fees)
+
+
+def entry_order_fee(value, risk):
+    if risk.round_trip_fee_pct is not None:
+        return value * risk.round_trip_fee_pct
+    return sum(order_fees(value, config=risk.fees).values())
+
+
+def same_session(entry_date, exit_date):
+    def cairo_day(value):
+        stamp = pd.Timestamp(value)
+        if pd.isna(stamp):
+            raise ValueError('Missing execution timestamp')
+        return (stamp.tz_localize('Africa/Cairo') if stamp.tzinfo is None else stamp.tz_convert('Africa/Cairo')).date()
+    return cairo_day(entry_date) == cairo_day(exit_date)
+
+
+def net_trade_pnl(entry: float, exit_price: float, shares: int, risk: RiskConfig, dividends_per_share: float = 0.0,
+                  *, same_session=False, entry_fills=None, exit_fills=None) -> float:
+    pre_tax = (exit_price - entry) * shares - trade_fees(entry, exit_price, shares, risk, same_session=same_session,
+                                                       entry_fills=entry_fills, exit_fills=exit_fills)
     return pre_tax - max(pre_tax, 0) * risk.capital_gains_tax_pct + dividends_per_share * (1 - risk.dividend_tax_pct) * shares
 
 
@@ -478,7 +517,7 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
 
     equity_events.append((data.index[start_index], equity))
 
-    while i < len(data):
+    while i < len(data) - 1:
         window = data.iloc[: i + 1]
         screen_ok, _ = passes_screener(window, cfg.screen)
         evaluation = evaluate_4_mirrors(window, cfg.signal)
@@ -495,7 +534,7 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
         exit_index = len(data) - 1
         exit_reason = "END"
 
-        for j in range(i, len(data)):
+        for j in range(i + 1, len(data)):
             row = data.iloc[j]
             if row["Low"] <= stop_loss:
                 exit_price = stop_loss
@@ -514,7 +553,8 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
 
         risk_per_share = entry - plan.stop_loss
         div_ps = dividends_between(data, i, exit_index)
-        pnl = net_trade_pnl(entry, float(exit_price), plan.shares, cfg.risk, div_ps)
+        pnl = net_trade_pnl(entry, float(exit_price), plan.shares, cfg.risk, div_ps,
+                            same_session=same_session(data.index[i], data.index[exit_index]))
         r_multiple = pnl / plan.risk_egp if plan.risk_egp > 0 else _trade_return(entry, float(exit_price), risk_per_share)
         equity += pnl
         r_values.append(r_multiple)

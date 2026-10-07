@@ -33,7 +33,9 @@ WINDOWS = {"W1": ("2020-01-01", "2021-12-31", "2022"), "W2": ("2021-01-01", "202
 COVID_PHASES = {"Pre-COVID": ("2020-01-01", "2020-02-29"), "Crash": ("2020-03-01", "2020-05-31"), "Recovery": ("2020-06-01", "2020-12-31")}
 SHOW = ["Baseline", "A_filters", "B_risk", "C_trend", "D_hold_6"]
 TOTAL = eng.RiskConfig().capital * 9
-FEE_SIDE = eng.RiskConfig().round_trip_fee_pct
+from fees_config import LEGACY_CORE_FEE_PER_SIDE
+# Historical index-weight benchmark has no order notionals; not a Thndr fee model.
+FEE_SIDE = LEGACY_CORE_FEE_PER_SIDE
 
 
 def _ts(day: str, end: bool = False) -> pd.Timestamp:
