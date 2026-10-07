@@ -31,3 +31,7 @@ Thumbs.db
 *.bak_*
 *.session
 *.session-journal
+# personal ledger: raw statements and private price files never go to git
+personal_journal/prices/*
+!personal_journal/prices/.gitkeep
+personal_journal/statements/

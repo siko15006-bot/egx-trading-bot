@@ -1,5 +1,21 @@
 # Known issues
 
+## Status index (2026-10-07) — sections below are unchanged; this table only classifies them
+
+| Status | Item | Section |
+|---|---|---|
+| 🔴 Open | Data health crashes on the Cairo DST spring-forward midnight (only matters for a Friday session / intraday data) | Data health fails on Cairo DST… |
+| 🔴 Open | Yahoo misses whole EGX sessions for stocks (e.g. 2026-06-22, 08-10, 10-06); ~2–4.5%/yr lower bound | Missing EGX sessions in Yahoo |
+| 🔴 Open | Yahoo misdates/omits split adjustments in `data/` (HDBK, EFID, INFI, …) — guarded by `DATA_BREAK`, not corrected | Execution conventions |
+| 🔴 Open | Universe excludes high-priced and single-bad-row stocks (SCTS, CPCI, MIPH, 13 others); widening deferred | Universe gaps |
+| ⚠️ Disputed | Thndr brokerage formula: "2 EGP + 0.1%" (fee page, used) vs "0.1% with EGP 2 minimum" (Trader page) | Execution conventions → Fees |
+| ❓ Unknown | Slippage size on EGX (10 bps default is an assumption); trading halts / limit-locked days; official holiday calendar | Execution conventions; Missing EGX sessions |
+| ❓ Unknown | Effect of misdated splits on the H3 research result | Execution conventions |
+| ✅ Closed (rule in place) | Filler rows handled as missing data | Yahoo filler rows |
+| ✅ Closed (rule in place) | `data/` vs fully adjusted series never mixed; dividends only on `data/`, enforced by `resolve_dividend_mode` | Price series; Dividends in backtests |
+| ✅ Closed | No Open-based fills; entry at next close; in-range fills; optimizer selects on main window only (OOS = 9 large caps) | Execution conventions |
+| ✅ Closed (verdict) | 4 Mirrors strategy ABANDON vs Buy & Hold | Strategy vs Buy & Hold |
+
 ## Data health fails on Cairo DST forward-transition midnight (2026-04-24 only)
 
 Daily (midnight) rows: only the April spring-forward breaks. Hourly data: exposed to both transitions
