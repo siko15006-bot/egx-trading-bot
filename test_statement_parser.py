@@ -57,3 +57,43 @@ def test_unknown_company_is_an_error_not_a_guess(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(st, "NAMES_FILE", names)
     with pytest.raises(ValueError, match="company not in company_names.json"):
         st.parse_pdf(REAL)
+
+
+def _fill(row_no, ticker, side, qty, price, fees="3.00", gross=None):
+    price = Decimal(price)
+    return {"row_no": row_no, "event_type": "fill", "ticker": ticker, "side": side, "qty": qty, "price": price,
+            "gross_value": Decimal(gross) if gross else qty * price, "total_fees": Decimal(fees)}
+
+
+def test_validate_balance_tags() -> None:
+    rows = [_fill(1, "AAA.CA", "BUY", 10, "10"), _fill(2, "AAA.CA", "SELL", 15, "11"),       # oversell by 5
+            _fill(3, "BBB.CA", "BUY", 10, "10", gross="100.02")]                              # gross off by 0.02
+    tags = [p.split()[0] for p in st.validate_balance(rows)]
+    assert "OVERSELL" in tags and "GROSS_MISMATCH" in tags
+    ok = [_fill(1, "AAA.CA", "BUY", 10, "10", gross="100.01")]                                 # 0.01 is tolerated
+    assert not any(p.startswith(("OVERSELL", "GROSS_MISMATCH")) for p in st.validate_balance(ok))
+    assert any(p.startswith("FEE_DIFF") for p in st.validate_balance([_fill(1, "AAA.CA", "BUY", 100, "10", fees="9")]))
+    assert any(p.startswith("HOLDINGS_MISMATCH") for p in st.validate_balance(ok, holdings={"AAA.CA": 9}))
+    assert st.validate_balance(ok, earlier_periods=[(7, "2026-07-01", "2026-07-31")],
+                               period=("2026-07-15", "2026-08-15"))[-1] == "PERIOD_OVERLAP with imports [7]"
+
+
+def test_import_writes_once_and_blocks_unaccepted_problems(tmp_path) -> None:
+    if not REAL.exists():
+        pytest.skip("real statement is private (gitignored)")
+    import sqlite3
+    db = tmp_path / "ledger.db"
+    with pytest.raises(ValueError, match="OVERSELL"):           # sells of shares bought before the period
+        st.import_file(REAL, db)
+    with sqlite3.connect(db) as con:
+        assert con.execute("SELECT COUNT(*) FROM imports").fetchone()[0] == 0   # nothing half-written
+    iid = st.import_file(REAL, db, accept=("OVERSELL",))
+    with sqlite3.connect(db) as con:
+        fills = con.execute("SELECT ts_cairo, ticker, side, qty, total_fees FROM fills WHERE import_id=?", (iid,)).fetchall()
+        raw = con.execute("SELECT COUNT(*) FROM raw_rows WHERE import_id=?", (iid,)).fetchone()[0]
+    rows = st.parse_pdf(REAL)["rows"]
+    assert len(fills) == len(rows) == raw
+    assert [(f[0], f[1], f[2], f[3], round(f[4], 2)) for f in fills] == [
+        (r["trade_date"], r["ticker"], r["side"], r["qty"], float(r["total_fees"])) for r in rows]
+    with pytest.raises(ValueError, match="already imported"):
+        st.import_file(REAL, db, accept=("OVERSELL",))

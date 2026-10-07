@@ -8,7 +8,7 @@
 | 🔴 Open | Yahoo misses whole EGX sessions for stocks (e.g. 2026-06-22, 08-10, 10-06); ~2–4.5%/yr lower bound | Missing EGX sessions in Yahoo |
 | 🔴 Open | Yahoo misdates/omits split adjustments in `data/` (HDBK, EFID, INFI, …) — guarded by `DATA_BREAK`, not corrected | Execution conventions |
 | 🔴 Open | Universe excludes high-priced and single-bad-row stocks (SCTS, CPCI, MIPH, 13 others); widening deferred | Universe gaps |
-| 🔴 Open | `fees_config` charges 0.05% stamp duty that the July 2026 statement did not (fees overstated ~5–16%); real fees = 3 EGP + 0.125% below 20k. "2 + 0.1%" brokerage settled. Not changed yet — Ahmed's decision | Execution conventions → Fees |
+| ❓ Unknown | الدمغة مش محصلة في يوليو 2026، السبب غير معروف. fees_config سليم (decision 2026-10-07: kept as is, stamp included → backtests stay conservative by 0.05% per side). "2 + 0.1%" brokerage settled | Execution conventions → Fees |
 | ❓ Unknown | Fees since the Thndr subscription (2026-09-24: brokerage 0) — no statement after that date yet | Execution conventions → Fees |
 | ❓ Unknown | Slippage size on EGX (10 bps default is an assumption); trading halts / limit-locked days; official holiday calendar | Execution conventions; Missing EGX sessions |
 | ❓ Unknown | Effect of misdated splits on the H3 research result | Execution conventions |
@@ -159,7 +159,9 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
   (so "2 EGP + 0.1%" is right), FRA minimum 1 EGP, EGX 0.01%, MCDR 0.01%, insurance 0.005%. A least-squares fit
   (3 + 0.1244%) misses one fill by 0.008; the component sum is exact. `fees_config` adds 0.05% stamp → overstates fees
   by 0.09–0.82 EGP per fill here. Why no stamp (exempt, charged elsewhere, not applied at this size) is unknown;
-  `fees_config` unchanged until Ahmed decides. The parser logs both (`logs/ledger_import_*.log`, FEE_DIFF tag).
+  **Decision (Ahmed, 2026-10-07): الدمغة مش محصلة في يوليو 2026، السبب غير معروف. fees_config سليم.** It stays
+  unchanged; `validate_balance` reports the gap as FEE_DIFF (a warning, never blocking) and the import log shows both
+  formulas (`logs/ledger_import_*.log`).
   **Thndr subscription from 2026-09-24** (annual, 2,646 EGP/yr ≈ 220.5/month, 50 trades/month, not carried over):
   brokerage 0. Statements before that date carry full fees; after it the parser assumes brokerage 0 — unverified
   until a post-24-09 statement arrives. A backtest of Ahmed's real cost would need fixed 2,646/yr + the non-brokerage

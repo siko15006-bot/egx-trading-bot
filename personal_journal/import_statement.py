@@ -9,8 +9,10 @@ CSV/XLSX: no real Thndr export seen yet, so their mapping is not implemented (Co
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import sqlite3
 import unicodedata
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -117,7 +119,7 @@ def parse_pdf(path: Path) -> dict[str, Any]:
                      "ts_cairo": None,  # the statement has no time of day
                      "ticker": ticker, "company_ar": company, "side": side, "qty": qty, "price": price,
                      "gross_value": gross, "amount": amount, "total_fees": fees, "fees_source": "derived: gross - net",
-                     "balance": _money(m["bal"]), "description": desc})
+                     "balance": _money(m["bal"]), "description": desc, "raw": visual})
     if "opening_balance" not in header or "closing_balance" not in header:
         raise ValueError(f"{path.name}: opening/closing balance not found — unknown layout")
     running = header["opening_balance"]
@@ -169,20 +171,105 @@ def fee_report(rows: list[dict[str, Any]], source: str) -> list[str]:
     return lines
 
 
+BLOCKING = ("OVERSELL", "GROSS_MISMATCH", "HOLDINGS_MISMATCH")   # FEE_DIFF and PERIOD_OVERLAP are warnings
+
+
 def validate_balance(rows: list[dict[str, Any]], holdings: dict[str, int] | None = None,
-                     *, earlier_periods: list[tuple[int, str, str]] | None = None) -> list[str]:
+                     *, earlier_periods: list[tuple[int, str, str]] | None = None,
+                     period: tuple[str, str] | None = None) -> list[str]:
     """Problems/warnings found before writing, each prefixed with a stable tag:
     OVERSELL (always checked on the rows alone, independent of `holdings`), GROSS_MISMATCH (qty×price vs gross
     > 0.01 EGP), FEE_DIFF (vs fees_config), HOLDINGS_MISMATCH (only when `holdings` is given) and
     PERIOD_OVERLAP (a warning: earlier import ids whose (from, to) overlaps → rows get review_flag
     POSSIBLE_DUPLICATE and Ahmed confirms; overlapping imports are allowed so older statements can be added).
     Position rows (transfer/bonus/IPO/split) change share counts for OVERSELL but are never BUY lots."""
-    raise NotImplementedError("next step: after Ahmed confirms the July parse")
+    from fees_config import order_fees
+
+    problems: list[str] = []
+    held: dict[str, int] = {}
+    for r in rows:
+        t = r.get("ticker")
+        if r.get("event_type") == "position":
+            held[t] = held.get(t, 0) + (-1 if r.get("kind") == "transfer_out" else 1) * int(r.get("qty") or 0)
+            continue
+        if r.get("side") not in ("BUY", "SELL"):
+            continue
+        qty, price, gross = int(r["qty"]), Decimal(str(r["price"])), Decimal(str(r["gross_value"]))
+        if abs(qty * price - gross) > CENT:
+            problems.append(f"GROSS_MISMATCH row {r.get('row_no')} {t}: {qty}×{price} = {qty * price} vs gross {gross}")
+        held[t] = held.get(t, 0) + (qty if r["side"] == "BUY" else -qty)
+        if held[t] < 0:
+            problems.append(f"OVERSELL row {r.get('row_no')} {t}: sells {qty}, open position in these rows {held[t] + qty}")
+            held[t] = 0
+        if r.get("total_fees") not in (None, ""):
+            cfg = Decimal(str(sum(order_fees(float(gross)).values()))).quantize(CENT, ROUND_HALF_UP)
+            fee = Decimal(str(r["total_fees"]))
+            if abs(fee - cfg) > CENT:
+                problems.append(f"FEE_DIFF row {r.get('row_no')} {t}: statement {fee} vs fees_config {cfg} ({fee - cfg:+})")
+    if holdings is not None:
+        for t in sorted(set(held) | set(holdings)):
+            if held.get(t, 0) != holdings.get(t, 0):
+                problems.append(f"HOLDINGS_MISMATCH {t}: rows {held.get(t, 0)} vs holdings {holdings.get(t, 0)}")
+    if earlier_periods and period:
+        hits = [i for i, f, to in earlier_periods if f <= period[1] and period[0] <= to]
+        if hits:
+            problems.append(f"PERIOD_OVERLAP with imports {hits}")
+    return problems
 
 
-def import_file(path: Path) -> int:
-    """detect → parse → validate → write imports/raw_rows/fills/cash_events in one transaction; returns import id."""
-    raise NotImplementedError("next step: after Ahmed confirms the July parse")
+def _db_float(x: Any) -> Any:
+    # ponytail: schema frozen with REAL money columns; values are 2-decimal Decimals, exact after round(x, 2) on read.
+    # Upgrade path (design note "Money storage"): integer piasters through an explicit migration.
+    return float(x) if isinstance(x, Decimal) else x
+
+
+def import_file(path: Path, db_path: Path | None = None, *, accept: tuple[str, ...] = ()) -> int:
+    """detect → parse → validate → write imports/raw_rows/fills/cash_events in one transaction; returns import id.
+    A blocking problem (OVERSELL, GROSS_MISMATCH, HOLDINGS_MISMATCH) stops the import unless Ahmed accepts its tag via
+    `accept` (e.g. the first statement sells shares bought before its period)."""
+    from contextlib import closing
+
+    from personal_journal import db as ledger_db
+
+    path = Path(path)
+    fmt = detect_format(path)
+    parsed = parse_pdf(path) if fmt == "pdf" else {"header": {}, "rows": parse_rows(path, fmt)}
+    rows, header = parsed["rows"], parsed["header"]
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    db_path = ledger_db.init_db(db_path or ledger_db.DB_PATH)
+    with closing(sqlite3.connect(db_path)) as con:
+        if con.execute("SELECT id FROM imports WHERE sha256 = ?", (digest,)).fetchone():
+            raise ValueError(f"{path.name}: already imported (sha256)")
+        earlier = con.execute("SELECT id, period_from, period_to FROM imports WHERE period_from IS NOT NULL").fetchall()
+        period = (header["period_from"], header["period_to"]) if "period_from" in header else None
+        problems = validate_balance(rows, earlier_periods=earlier, period=period)
+        blocking = [p for p in problems if p.split()[0] in BLOCKING and p.split()[0] not in accept]
+        if blocking:
+            raise ValueError(f"{path.name}: not imported —\n" + "\n".join(blocking))
+        overlap = next((p for p in problems if p.startswith("PERIOD_OVERLAP")), None)
+        flag = "POSSIBLE_DUPLICATE" if overlap else None
+        with con:  # one transaction: all rows or nothing
+            iid = con.execute("INSERT INTO imports (file_name, sha256, imported_at, period_from, period_to, row_count, "
+                              "overlaps_imports) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                              (path.name, digest, datetime.now().astimezone().isoformat(timespec="seconds"),
+                               header.get("period_from"), header.get("period_to"), len(rows),
+                               overlap.split("imports ", 1)[1] if overlap else None)).lastrowid
+            for r in rows:
+                if r["event_type"] != "fill":
+                    raise ValueError(f"row {r['row_no']}: event type {r['event_type']} not mapped yet")
+                con.execute("INSERT INTO raw_rows VALUES (?, ?, ?)", (iid, r["row_no"], json.dumps(
+                    {k: str(v) if isinstance(v, Decimal) else v for k, v in r.items()}, ensure_ascii=False)))
+                # the statement gives a date only: ts_cairo = that date, no invented time; fee components unknown → NULL
+                con.execute("INSERT INTO fills (import_id, row_no, ts_cairo, ticker, side, qty, price, gross_value, "
+                            "total_fees, review_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (iid, r["row_no"], r["ts_cairo"] or r["trade_date"], r["ticker"], r["side"], r["qty"],
+                             _db_float(r["price"]), _db_float(r["gross_value"]), _db_float(r["total_fees"]), flag))
+    LOG_DIR.mkdir(exist_ok=True)
+    with (LOG_DIR / f"ledger_import_{datetime.now():%Y%m%d}.log").open("a", encoding="utf-8") as f:
+        f.write(f"===== {datetime.now():%Y-%m-%d %H:%M:%S} import {path.name} -> id {iid}, {len(rows)} rows, "
+                f"accepted={list(accept)}\n" + "\n".join(problems) + "\n")
+    fee_report(rows, path.name)
+    return iid
 
 
 if __name__ == "__main__":
@@ -194,3 +281,4 @@ if __name__ == "__main__":
     parsed = parse_pdf(p) if fmt == "pdf" else {"header": {}, "rows": parse_rows(p, fmt)}
     print(f"format={fmt} header={ {k: str(v) for k, v in parsed['header'].items()} }")
     print("\n".join(fee_report(parsed["rows"], p.name)))
+    print("\n".join(validate_balance(parsed["rows"])) or "validate_balance: no problems")

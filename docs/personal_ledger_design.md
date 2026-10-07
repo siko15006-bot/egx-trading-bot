@@ -106,3 +106,15 @@ T0 refund; asserts on parsed fills, FIFO round trips, fee recomputation and the 
   with `Decimal`). Not urgent while the tables are empty; must be settled together with the parser.
 - **`validate_balance`:** the oversell check ("no SELL larger than the open position") must run on the fills alone,
   always — it must not depend on the optional `holdings` argument, which only adds the reconciliation with the app.
+
+## Implemented (2026-10-07, first statement E-STATEMENT_Jul_2026_01.pdf)
+
+- Real format is a PDF (no Thndr CSV/XLSX export seen); `parse_pdf` reads it with pdfplumber, every row must
+  reconcile with the running and closing balance. Company names → tickers via `personal_journal/company_names.json`.
+- The statement has **no time of day**: `fills.ts_cairo` holds the date (`YYYY-MM-DD`), no invented time.
+- The statement gives **total fees only** (gross − net): the component columns stay NULL.
+- Money is still written to the frozen `REAL` columns (2-decimal values); piasters need an explicit migration.
+- `validate_balance`: OVERSELL / GROSS_MISMATCH / HOLDINGS_MISMATCH block the import; FEE_DIFF / PERIOD_OVERLAP warn.
+  A blocking tag is overridden only by `import_file(..., accept=(tag,))` on Ahmed's decision — used once for July:
+  4 sells close shares bought before 2026-07-01 (OVERSELL on the rows alone), so their round trips lack a buy cost
+  until an earlier statement is imported.
