@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS fills (               -- one row per executed transac
     brokerage REAL, egx REAL, mcdr REAL, fra REAL, insurance REAL, stamp REAL, other_fees REAL,
     total_fees REAL NOT NULL,
     order_ref TEXT,
-    UNIQUE (order_ref, ts_cairo, qty, price)
+    -- identity = "row X of statement Y": two real executions can share day, ticker, qty and price, so the
+    -- trade's own fields must never be a unique key. Re-importing a file is blocked by imports.sha256 instead.
+    UNIQUE (import_id, row_no)
 );
 CREATE TABLE IF NOT EXISTS cash_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
