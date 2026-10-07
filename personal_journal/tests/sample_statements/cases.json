@@ -1,0 +1,600 @@
+[
+  {
+    "name": "partial_fills_three",
+    "file": "partial_fills_three.csv",
+    "rows": 3,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:01+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 30,
+        "price": "10.00",
+        "gross_value": "300.00",
+        "total_fees": "3.01",
+        "order_ref": "SYN-PARTIAL"
+      },
+      {
+        "ts_cairo": "2026-10-05T12:00:02+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 40,
+        "price": "10.10",
+        "gross_value": "404.00",
+        "total_fees": "3.02",
+        "order_ref": "SYN-PARTIAL"
+      },
+      {
+        "ts_cairo": "2026-10-05T12:00:03+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 30,
+        "price": "10.20",
+        "gross_value": "306.00",
+        "total_fees": "3.03",
+        "order_ref": "SYN-PARTIAL"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": "Three executions, not one averaged fill; supplied per-fill fees are synthetic, not a Thndr formula."
+  },
+  {
+    "name": "order_refund",
+    "file": "order_refund.csv",
+    "rows": 2,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      },
+      {
+        "event_type": "cash",
+        "ts_cairo": "2026-10-05T12:00:01+03:00",
+        "kind": "other",
+        "ticker": "ABUK.CA",
+        "amount": "200.00"
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Proposed kind=other. Refund may release reserved cash rather than be new income; classification alone cannot establish PnL."
+  },
+  {
+    "name": "dividend",
+    "file": "dividend.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "cash",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "dividend",
+        "ticker": "ABUK.CA",
+        "amount": "25.00"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "stamp_refund",
+    "file": "stamp_refund.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "cash",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "stamp_refund",
+        "ticker": "ABUK.CA",
+        "amount": "2.50"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "trader_kickback",
+    "file": "trader_kickback.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "cash",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "commission_kickback",
+        "ticker": "ABUK.CA",
+        "amount": "5.00"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "transfer_in",
+    "file": "transfer_in.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "position",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "transfer_in",
+        "ticker": "ABUK.CA",
+        "qty": 100
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Position event, not a fabricated executed BUY/SELL. No storage representation exists yet."
+  },
+  {
+    "name": "transfer_out",
+    "file": "transfer_out.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "position",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "transfer_out",
+        "ticker": "ABUK.CA",
+        "qty": 40
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Position event, not a fabricated executed BUY/SELL. No storage representation exists yet."
+  },
+  {
+    "name": "bonus_shares",
+    "file": "bonus_shares.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "position",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "bonus_shares",
+        "ticker": "ABUK.CA",
+        "qty": 50
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Position event, not a fabricated executed BUY/SELL. No storage representation exists yet."
+  },
+  {
+    "name": "subscription_allocation",
+    "file": "subscription_allocation.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "position",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "subscription_allocation",
+        "ticker": "ABUK.CA",
+        "qty": 100,
+        "amount": "-500.00"
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "IPO/right subscription allocation is NOT a Trader subscription fee. Full cost-basis/cash treatment remains undecided."
+  },
+  {
+    "name": "split_during_period",
+    "file": "split_during_period.csv",
+    "rows": 3,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "100.00",
+        "gross_value": "1000.00",
+        "total_fees": "5.00",
+        "order_ref": "SYN-SPLIT-BUY"
+      },
+      {
+        "event_type": "position",
+        "ts_cairo": "2026-10-06T12:00:00+03:00",
+        "kind": "split",
+        "ticker": "ABUK.CA",
+        "ratio_num": 2,
+        "ratio_den": 1
+      },
+      {
+        "ts_cairo": "2026-10-07T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "SELL",
+        "qty": 10,
+        "price": "60.00",
+        "gross_value": "600.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-SPLIT-SELL"
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Parser must preserve the ratio and event order. Corporate-action-aware FIFO is NOT specified by current fills-only API."
+  },
+  {
+    "name": "oversell",
+    "file": "oversell.csv",
+    "rows": 2,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-BUY"
+      },
+      {
+        "ts_cairo": "2026-10-06T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "SELL",
+        "qty": 11,
+        "price": "12.00",
+        "gross_value": "132.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-SELL"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "arabic_only",
+    "file": "arabic_only.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 100,
+        "price": "10.00",
+        "gross_value": "1000.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-AR"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "english_only",
+    "file": "english_only.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "mixed_language",
+    "file": "mixed_language.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-MIX"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "fees_column_missing",
+    "file": "fees_column_missing.csv",
+    "rows": 1,
+    "expected": null,
+    "error": "Fees",
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Fail closed on absent fees; UNKNOWN must not silently become zero. Missing-fee policy needs approval."
+  },
+  {
+    "name": "date_dmy_slash",
+    "file": "date_dmy_slash.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Synthetic contract declares Egyptian DMY. Do not infer DMY for an unknown real statement without metadata."
+  },
+  {
+    "name": "date_dmy_dash",
+    "file": "date_dmy_dash.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Synthetic contract declares Egyptian DMY. Do not infer DMY for an unknown real statement without metadata."
+  },
+  {
+    "name": "date_iso",
+    "file": "date_iso.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": "Synthetic contract declares Egyptian DMY. Do not infer DMY for an unknown real statement without metadata."
+  },
+  {
+    "name": "fees_explicit_zero",
+    "file": "fees_explicit_zero.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "0.00",
+        "order_ref": "SYN-ZERO"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "unknown_header",
+    "file": "unknown_header.csv",
+    "rows": 1,
+    "expected": null,
+    "error": "MysteryColumn",
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "gross_mismatch",
+    "file": "gross_mismatch.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.02",
+        "total_fees": "3.00",
+        "order_ref": "SYN-GROSS"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "gross_tolerance_boundary",
+    "file": "gross_tolerance_boundary.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.01",
+        "total_fees": "3.00",
+        "order_ref": "SYN-BOUNDARY"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "fractional_quantity",
+    "file": "fractional_quantity.csv",
+    "rows": 1,
+    "expected": null,
+    "error": "Quantity",
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "utc_timestamp",
+    "file": "utc_timestamp.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "cairo_winter_timestamp",
+    "file": "cairo_winter_timestamp.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-11-05T12:00:00+02:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "ticker_outside_universe",
+    "file": "ticker_outside_universe.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "MIPH.CA",
+        "side": "BUY",
+        "qty": 2,
+        "price": "800.00",
+        "gross_value": "1600.00",
+        "total_fees": "4.00",
+        "order_ref": "SYN-MIPH"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "already_suffixed_ticker",
+    "file": "already_suffixed_ticker.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-001"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "negative_cash_subscription",
+    "file": "negative_cash_subscription.csv",
+    "rows": 1,
+    "expected": [
+      {
+        "event_type": "cash",
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "kind": "subscription",
+        "ticker": null,
+        "amount": "-245.00"
+      }
+    ],
+    "error": null,
+    "status": "DESIGN_REQUIREMENT",
+    "notes": ""
+  },
+  {
+    "name": "fees_blank",
+    "file": "fees_blank.csv",
+    "rows": 1,
+    "expected": null,
+    "error": "Fees",
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Blank is not explicit zero; fail-closed policy is proposed."
+  },
+  {
+    "name": "identical_execution_rows",
+    "file": "identical_execution_rows.csv",
+    "rows": 2,
+    "expected": [
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-SAME"
+      },
+      {
+        "ts_cairo": "2026-10-05T12:00:00+03:00",
+        "ticker": "ABUK.CA",
+        "side": "BUY",
+        "qty": 10,
+        "price": "10.00",
+        "gross_value": "100.00",
+        "total_fees": "3.00",
+        "order_ref": "SYN-SAME"
+      }
+    ],
+    "error": null,
+    "status": "PROPOSED_NEEDS_DECISION",
+    "notes": "Parser must not silently deduplicate source rows; import identity needs a transaction/execution id or explicit ambiguity handling."
+  }
+]

@@ -25,10 +25,20 @@ or shown on a shared page, raw statement files kept outside the repo. Nothing fr
 |---|---|---|
 | `imports` | id, file_name, sha256, imported_at, period_from, period_to, row_count | Same file twice → rejected by sha256 |
 | `raw_rows` | import_id, row_no, raw_json | Untouched copy of every statement row (audit trail) |
-| `fills` | id, import_id, row_no, ts_cairo, ticker, side (BUY/SELL), qty, price, gross_value, brokerage, egx, mcdr, fra, insurance, stamp, other_fees, total_fees, order_ref | One row per executed transaction; UNIQUE(order_ref, ts, qty, price) |
+| `fills` | id, import_id, row_no, ts_cairo, ticker, side (BUY/SELL), qty, price, gross_value, brokerage, egx, mcdr, fra, insurance, stamp, other_fees, total_fees, order_ref | One row per executed transaction; UNIQUE(import_id, row_no) — see "Fill identity" |
 | `cash_events` | id, import_id, ts_cairo, kind, ticker, amount | dividend, stamp T0 refund, commission kickback (Trader), custody fee, subscription, deposit, withdrawal |
 | `round_trips` | id, ticker, open_ts, close_ts, qty, avg_buy, avg_sell, fees, dividends, tax, net_pnl, net_pct, holding_sessions, same_session | Derived (rebuilt, never edited): FIFO matching of fills per ticker |
 | `trip_sources` | trip_id, source, ref, lag_minutes | Derived: matched signal, if any (see below) |
+
+## Fill identity (changed 2026-10-07, found by Codex's ledger tests)
+
+The first schema made `(order_ref, ts_cairo, qty, price)` unique. Two genuine executions can share all four (same day,
+stock, quantity and price — e.g. two fills of one order), so the second would have been rejected and the trade lost.
+A fill is now identified by **where it came from: row `row_no` of import `import_id`**, `UNIQUE(import_id, row_no)`.
+- Importing the same file twice is still blocked by `imports.sha256`.
+- New risk this opens: two *different* files covering the same days (e.g. a monthly and a yearly export) would load
+  the same trades twice. `validate_balance` must therefore reject a new import whose period overlaps an earlier one
+  unless the overlap is explicitly resolved; reconciliation with the app's holdings is the backstop.
 
 ## Parser
 
