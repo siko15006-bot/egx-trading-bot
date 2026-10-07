@@ -123,7 +123,24 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
   Sensitivity on `data/` (330 trades, before these changes): each 10 bps ≈ −11.4k EGP. Proposed next step once fills
   exist: fixed + k·√(order value / 20-day traded value).
 - **Optimizer selection:** best scenario chosen on the main (`data/`) window only; 2022-23 stays out-of-sample.
-  Main-window metrics, and the trailing multiplier chosen on them, are in-sample.
+  Main-window metrics, and the trailing multiplier chosen on them, are in-sample. Scope of that out-of-sample test:
+  **9 large caps only (ADIB, COMI, EAST, EFIH, ETEL, HRHO, MNHD, SWDY, TMGH), chosen in 2026 → survivorship bias and
+  limited representativeness** of the 90-stock universe. (`data_health` rejects ADIB and TMGH there — 5 of 6,105 rows
+  have Close up to 0.8% above High, an artefact of Yahoo's per-field adjustment — but the optimizer never calls
+  `data_health`, so all 9 are used.)
 - **Fees:** Thndr tariff from `fees_config.py` (live page read 2026-10-07). Open question: Thndr's fee page says
   "2 EGP + 0.1%", its Trader page says "0.1% with EGP 2 minimum"; the fee page (with a worked 5,000 EGP = 7 EGP
   example) is used until a real contract note settles it.
+
+## Universe gaps — what `egx_universe.json` (v90-20261005) leaves out
+
+Built by Codex's `universe_discovery.py` (`score()`, lines 83–101; top 90 by liquidity at line 216; script is not in
+this repo). `egx_lists.filter_universe` applies it everywhere: dashboard, scanner, auto-sim, optimizer.
+- **Price cap 5..500 EGP** drops liquid high-priced names: SCTS (545 EGP, 10.8M/day — price is its only failure),
+  CPCI (596 EGP, 7.0M/day — price only), MIPH (812 EGP), AXPH (1,507 EGP), WCDF (654 EGP).
+- **"Invalid High/Low/Close/Volume" anywhere in 2 years** drops the whole stock for a single bad row: 13 stocks with
+  enough history (BIDI, MIPH, AXPH, NEDA, FNAR, WCDF, SEIG, SAIB, FAITA, MOIN, NINH, UNIT, EGREF).
+- **MIPH (Mina Pharm)** specifically: price 812 EGP, 6-month mean turnover 4.79M EGP/day (threshold 5M), and 65 of 492
+  Yahoo rows where Close is stuck at 156.92 while High/Low move (Yahoo did not update Close in late 2024).
+- Decision 2026-10-07: universe unchanged for now; widening is deferred until the personal ledger
+  (`docs/personal_ledger_design.md`) shows which stocks Ahmed actually trades.
