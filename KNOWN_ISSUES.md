@@ -8,8 +8,9 @@
 | 🔴 Open | Yahoo misses whole EGX sessions for stocks (e.g. 2026-06-22, 08-10, 10-06); ~2–4.5%/yr lower bound | Missing EGX sessions in Yahoo |
 | 🔴 Open | Yahoo misdates/omits split adjustments in `data/` (HDBK, EFID, INFI, …) — guarded by `DATA_BREAK`, not corrected | Execution conventions |
 | 🔴 Open | Universe excludes high-priced and single-bad-row stocks (SCTS, CPCI, MIPH, 13 others); widening deferred | Universe gaps |
-| ❓ Unknown | الدمغة مش محصلة في يوليو 2026، السبب غير معروف. fees_config سليم (decision 2026-10-07: kept as is, stamp included → backtests stay conservative by 0.05% per side). "2 + 0.1%" brokerage settled | Execution conventions → Fees |
-| ❓ Unknown | Fees since the Thndr subscription (2026-09-24: brokerage 0) — no statement after that date yet | Execution conventions → Fees |
+| ❓ Unknown | الدمغة مش محصلة في يوليو 2026، السبب غير معروف. fees_config سليم (Ahmed 2026-10-07). July only — stamp is charged from August on, so `fees_config` is the real tariff | Execution conventions → Fees |
+| ✅ Closed | `fees_config` (with stamp) verified on 13/15 Aug–Sep fills + a Thndr invoice line by line; subscription (2026-09-24) = brokerage charged then refunded same day ("رد العمولة", 6/6 = 2 + 0.1%) | Execution conventions → Fees |
+| ❓ Unknown | FUND_DOCUMENT_FEE: exchange-traded fund certificate (وثائق صندوق المصريين, 2026-09-07) charged +1.01 EGP above `fees_config`; cause unknown — ask Thndr support. Not corrected | Execution conventions → Fees |
 | ❓ Unknown | Slippage size on EGX (10 bps default is an assumption); trading halts / limit-locked days; official holiday calendar | Execution conventions; Missing EGX sessions |
 | ❓ Unknown | Effect of misdated splits on the H3 research result | Execution conventions |
 | ✅ Closed (rule in place) | Filler rows handled as missing data | Yahoo filler rows |
@@ -153,19 +154,21 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
 - **Fees:** Thndr tariff from `fees_config.py` (live page read 2026-10-07). Open question: Thndr's fee page says
   "2 EGP + 0.1%", its Trader page says "0.1% with EGP 2 minimum"; the fee page (with a worked 5,000 EGP = 7 EGP
   example) is used until a real contract note settles it.
-  **Settled by the first real statement (E-STATEMENT_Jul_2026_01, 5 fills, 2026-10-07):** fees charged = every
-  `fees_config` component **except stamp duty**, each rounded half-up to the piaster — exact on 5/5 fills (4 sells,
-  1 buy, 186–1,624 EGP; details in the gitignored statement). Below 20,000 EGP that is **3 EGP + 0.125%**: brokerage 2 + 0.1%
-  (so "2 EGP + 0.1%" is right), FRA minimum 1 EGP, EGX 0.01%, MCDR 0.01%, insurance 0.005%. A least-squares fit
-  (3 + 0.1244%) misses one fill by 0.008; the component sum is exact. `fees_config` adds 0.05% stamp → overstates fees
-  by 0.09–0.82 EGP per fill here. Why no stamp (exempt, charged elsewhere, not applied at this size) is unknown;
-  **Decision (Ahmed, 2026-10-07): الدمغة مش محصلة في يوليو 2026، السبب غير معروف. fees_config سليم.** It stays
-  unchanged; `validate_balance` reports the gap as FEE_DIFF (a warning, never blocking) and the import log shows both
-  formulas (`logs/ledger_import_*.log`).
-  **Thndr subscription from 2026-09-24** (annual, 2,646 EGP/yr ≈ 220.5/month, 50 trades/month, not carried over):
-  brokerage 0. Statements before that date carry full fees; after it the parser assumes brokerage 0 — unverified
-  until a post-24-09 statement arrives. A backtest of Ahmed's real cost would need fixed 2,646/yr + the non-brokerage
-  components, not `fees_config`.
+  **Settled by real statements (Jul–Sep 2026, 20 fills) and a Thndr invoice (2026-10-07):** the invoice itemises
+  EGX 0.01%, MCDR 0.01%, FRA 1.00 minimum, insurance 0.005%, **stamp duty 0.05%**, brokerage 0.1% and an order fee of
+  2 EGP — exactly `fees_config`, each component rounded half-up to the piaster. Statements: August and September match
+  full `fees_config` on 13/15 fills; HEBCO 27/9 is −0.02 (rounding, ignored — FEE_TOLERANCE 0.02); the fund
+  certificate below is the other.
+  **Decision (Ahmed, 2026-10-07): الدمغة مش محصلة في يوليو 2026، السبب غير معروف. fees_config سليم.** July's 5 fills
+  equal `fees_config` minus stamp exactly (= 3 EGP + 0.125% below 20k); that is the only month without stamp.
+  `validate_balance` tags such a fill FEE_NO_STAMP (warning). An earlier note here read July as the general rule — wrong.
+  **FUND_DOCUMENT_FEE:** buying 23 certificates of صندوق المصريين للاستثمار العقاري (exchange-traded, 2026-09-07) cost
+  +1.01 EGP above `fees_config`. Cause unknown (issue fee? different tariff?) — ask Thndr support; not corrected.
+  **Thndr subscription from 2026-09-24** (annual, 2,646 EGP debited 2026-09-25, 50 trades/month, not carried over):
+  brokerage is still **charged** on each fill, then refunded the same day as a separate row "رد العمولة" equal to
+  2 + 0.1% (6/6 fills). Net fee after the subscription = `fees_config` − brokerage. The ledger keeps the charged fee on
+  the fill and the refund as `cash_events.commission_refund`. Statements before 24-09 carry full fees. A backtest of
+  Ahmed's real cost needs fixed 2,646/yr + the non-brokerage components, not `fees_config` alone.
 
 ## Universe gaps — what `egx_universe.json` (v90-20261005) leaves out
 

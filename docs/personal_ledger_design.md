@@ -118,3 +118,18 @@ T0 refund; asserts on parsed fills, FIFO round trips, fee recomputation and the 
   A blocking tag is overridden only by `import_file(..., accept=(tag,))` on Ahmed's decision — used once for July:
   4 sells close shares bought before 2026-07-01 (OVERSELL on the rows alone), so their round trips lack a buy cost
   until an earlier statement is imported.
+
+## Migration 1 + Aug–Sep statements (2026-10-07)
+
+- `db.MIGRATIONS[0]` (explicit, `PRAGMA user_version` = 1): table `fund_holdings` (fund sub-account `*_02`
+  statements: units REAL, value, balance; no fees, no FIFO, never in stock P&L); `cash_events.kind` adds
+  `subscription_fee`, `commission_refund`, `transfer_to_fund`, `transfer_from_fund`; `imports` adds `account`
+  (main/fund), `opening_balance`, `closing_balance`. Import id 1 (July) backfilled from its own file (sha256 checked).
+- Chain check: an import's opening balance must equal the closing balance of the previous import of the same account
+  (CHAIN_BREAK blocks). OVERSELL now counts shares already in the ledger (pre-ledger holdings count as 0).
+- Fees: the fill keeps the fee as charged; a subscription refund ("رد العمولة") is its own cash event linked to the
+  fill; net fee = charged − refund. Tags: FEE_NO_STAMP (July), FUND_DOCUMENT_FEE, REFUND_DIFF, FEE_DIFF (> 0.02).
+- The fund account's transfer rows mirror the main account's transfers: raw_rows only, so cash is counted once.
+- `company_names.json`: sections `companies`, `funds`, `_unresolved` (names whose ticker could not be verified — the
+  parser stops on them and quotes the note). `analytics.fund_summary()` reports funds apart from stocks.
+- E-INVOICE (per-trade contract note, itemised fees) is recognised and refused: separate parser later.

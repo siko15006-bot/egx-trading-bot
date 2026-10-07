@@ -1,8 +1,31 @@
 {
-  "_note": "Thndr statement name (Arabic, as printed) -> ticker. Each entry verified: the statement price lies inside that day's Low-High in data/. Unknown name -> parser error, never a guess.",
-  "القاهره للاستثمار والتنميه العقاريه(سيرا للتعليم)": "CIRA.CA",
-  "مصرف ابوظبى الاسلامي - مصر": "ADIB.CA",
-  "الشركة المصرية للاتصالات": "ETEL.CA",
-  "النيل للادوية والصناعات الكيماوية": "NIPH.CA",
-  "البنك التجاري الدولي (مصر)": "COMI.CA"
+  "_note": "Thndr statement name (Arabic, as printed) -> ticker. Each company verified: the statement price lies inside that day's Low-High (data/, or Yahoo for tickers outside data/); ORAS by the ISIN on Thndr's own invoice (EGS95001C011, Yahoo's ORAS prices are broken). Unknown name -> parser error, never a guess.",
+  "companies": {
+    "القاهره للاستثمار والتنميه العقاريه(سيرا للتعليم)": "CIRA.CA",
+    "مصرف ابوظبى الاسلامي - مصر": "ADIB.CA",
+    "الشركة المصرية للاتصالات": "ETEL.CA",
+    "النيل للادوية والصناعات الكيماوية": "NIPH.CA",
+    "البنك التجاري الدولي (مصر)": "COMI.CA",
+    "مصر للالومنيوم": "EGAL.CA",
+    "اوراسكوم كونستراكشون ليميتد": "ORAS.CA",
+    "ام ام جروب للصناعات والتجاره العالميه": "MTIE.CA",
+    "المصرية الدولية للصناعات الدوائية- ايبكو": "PHAR.CA",
+    "الجيزةالعامة للمقاولات": "GGCC.CA",
+    "الاسكندرية للخدمات الطبية -المركز الطبى الجديد": "AMES.CA",
+    "مينا فارم للأدوية والصناعات الكيماوية": "MIPH.CA",
+    "ابن سينا فارما": "ISPH.CA",
+    "المنصوره للدواجن": "MPCO.CA",
+    "الصناعات الهندسية المعمارية للانشاء والتعمير - ايكون": "ENGC.CA"
+  },
+  "funds": {
+    "thndrsavings": "Thndr Savings",
+    "thndrgold": "Thndr Gold",
+    "BSB": "BSB",
+    "BMM": "BMM",
+    "ABR": "ABR"
+  },
+  "_unresolved": {
+    "هيبكو للاستثمارات التجارية والتنمية العقارية": "ticker not found on Yahoo — Ahmed to confirm from the Thndr app",
+    "وثائق صندوق المصريين للاستثمار العقارى": "exchange-traded fund certificate; Yahoo lists EGS694B1C017.CA with no prices — Ahmed to confirm"
+  }
 }
