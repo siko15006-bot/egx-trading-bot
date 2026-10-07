@@ -1,6 +1,6 @@
-# Optimization Report v2 — 4 Mirrors v3 + Hybrid (generated 2026-10-07 19:58)
+# Optimization Report v2 — 4 Mirrors v3 + Hybrid (generated 2026-10-08 02:05)
 
-Execution is **realistic for every number in this report**: entry at the close after the signal, first exit on the bar after that; fills per `docs/execution_policy.md` (level, real open on a gap, else close; zero-volume rows never fill; trades across a data break cancelled). A/B/C/Baseline = one independent 100,000 EGP account per stock; D = one shared account of the same total; Buy & Hold = equal weight, same window.
+Execution is **realistic for every number in this report**: entry at the close after the signal, first exit on the bar after that; fills per `docs/execution_policy.md` (level, or that bar's Close on a gap — never the Open; zero-volume rows never fill; trades across a data break cancelled). A/B/C/Baseline = one independent 100,000 EGP account per stock; D = one shared account of the same total; Buy & Hold = equal weight, same window.
 
 ## 1.2 Look-ahead
 
@@ -20,7 +20,7 @@ Selected **4×ATR** (highest PF) — used for C below and carried unchanged into
 
 | Scenario | Trades | Win rate | Profit factor | Max DD | Sharpe | Total return | CAGR | Avg capital deployed | Mean R | P(mean R ≤ 0) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Baseline | 309 | 44.3% | 1.49 | -0.24% | 2.35 | +0.76% | +0.99% | 2.9% | 0.23 | 0.1% |
+| Baseline | 309 | 44.3% | 1.50 | -0.24% | 2.35 | +0.76% | +1.00% | 2.9% | 0.23 | 0.1% |
 | A_filters | 87 | 42.5% | 1.19 | -0.11% | 0.66 | +0.09% | +0.11% | 1.0% | 0.07 | 31.4% |
 | B_risk | 276 | 46.4% | 1.99 | -0.24% | 3.58 | +1.02% | +1.34% | 2.5% | 0.32 | 0.0% |
 | C_trend | 298 | 45.3% | 3.28 | -0.17% | 4.98 | +1.91% | +2.50% | 3.4% | 0.56 | 0.0% |
@@ -37,8 +37,8 @@ USD/EGP moved ×1.97 over the window: in EGP the market rose; in USD it was a we
 
 | Scenario | Trades | Win rate | Profit factor | Max DD | Sharpe | Total return | CAGR | Avg capital deployed | Mean R | P(mean R ≤ 0) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Baseline | 87 | 35.6% | 0.88 | -1.39% | -0.32 | -0.59% | -0.32% | 3.0% | -0.04 | 63.0% |
-| A_filters | 21 | 66.7% | 3.38 | -0.25% | 1.53 | +1.29% | +0.68% | 0.8% | 0.68 | 0.5% |
+| Baseline | 87 | 35.6% | 0.88 | -1.39% | -0.33 | -0.62% | -0.33% | 3.0% | -0.04 | 64.1% |
+| A_filters | 21 | 66.7% | 3.33 | -0.25% | 1.51 | +1.26% | +0.67% | 0.8% | 0.67 | 0.5% |
 | B_risk | 77 | 42.9% | 1.09 | -1.25% | 0.19 | +0.32% | +0.17% | 2.6% | 0.04 | 38.7% |
 | C_trend | 77 | 40.3% | 1.72 | -1.17% | 1.01 | +1.97% | +1.05% | 3.1% | 0.22 | 7.0% |
 | D_hold_4 | 36 | 38.9% | 3.22 | -12.31% | 1.26 | +42.35% | +20.70% | 38.5% | 0.59 | 1.6% |
@@ -63,8 +63,8 @@ USD/EGP moved ×1.97 over the window: in EGP the market rose; in USD it was a we
 
 | Scenario | EGP | USD |
 |---|---|---|
-| Baseline | -0.59% | -49.53% |
-| A_filters | +1.29% | -48.57% |
+| Baseline | -0.62% | -49.54% |
+| A_filters | +1.26% | -48.59% |
 | B_risk | +0.32% | -49.07% |
 | C_trend | +1.97% | -48.23% |
 | D_hold_4 | +42.35% | -27.72% |

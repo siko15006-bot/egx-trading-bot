@@ -8,8 +8,8 @@ Rules (fixed, same as egx_4_mirrors_v3.backtest except where noted):
   Skipped if that ticker already has an OPEN auto-sim trade. Stored entry starts as the signal close and is replaced
   by the real fill (next session close) once that bar exists.
 - Same execution policy as the engine (egx_4_mirrors_v3.simulate_trade, docs/execution_policy.md): entry at the close
-  of the session after the signal, exits from the bar after that, SL before TP, stop/target at the level or at a real
-  open on a gap (else that bar's close), no fills on zero-volume rows, and a >25% data break cancels the trade
+  of the session after the signal, exits from the bar after that, SL before TP, stop/target at the level, or at that bar's
+  Close on a gap (Open is never used), no fills on zero-volume rows, and a >25% data break cancels the trade
   (status CANCELLED, no P&L).
 - Trailing stop exactly as the engine: Close ≥ entry+2·ATR → stop ≥ entry+ATR; Close ≥ entry+ATR → stop ≥ entry.
 - PnL via egx_4_mirrors_v3.net_trade_pnl, including net dividends (data/ is dividend-unadjusted).

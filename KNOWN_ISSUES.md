@@ -123,14 +123,15 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
 `egx_4_mirrors_v3.simulate_trade` / `stop_fill` / `target_fill` / `data_breaks`.
 
 - **Yahoo's EGX Open is not an opening price.** On `data/` real bars it equals the previous Close 98.2% of the time
-  and lies outside [Low, High] 18.2% of the time. A gap fill uses the Open only when it is a real price (inside
-  [Low, High] and ≠ previous close), else that bar's close — repro of the old bug: ABUK 2026-03-08, Open 77.93 below
+  and lies outside [Low, High] 18.2% of the time. No fill uses the Open (2026-10-08): a gap fills at that bar's
+  Close — repro of the old bug: ABUK 2026-03-08, Open 77.93 below
   Low 83.0, filled at a price the stock never traded.
-  `Gap_Pct` in the signal screen still uses it and is therefore close to 0 on most bars (strategy is ABANDON anyway).
+  `Gap_Pct` in the signal screen (`max_gap_pct` filter, signal side, not execution) still uses it and is therefore
+  close to 0 on most bars (strategy is ABANDON anyway).
 - **Entry = close of the session after the signal.** Signals are computed after the close (daily runner 14:45, data
   cutoff 14:30), so the signal-day close is not executable. Exits are checked from the bar after the entry bar.
 - **Fills, filler rows, data breaks (superseded 2026-10-07 by `docs/execution_policy.md`):** stop/target fill at
-  the level, or on a gap at a real open (else the bar's close); zero-volume rows never fill; a move beyond ±25% per
+  the level, or on a gap at that bar's Close (never the Open); zero-volume rows never fill; a move beyond ±25% per
   elapsed session either way is a data break and a trade across it is **cancelled** (excluded and counted), not
   closed retroactively. The scanner reports `DATA_BREAK` instead of a signal for 60 bars.
   Found on `data/` (2025-10 → 2026-10), symmetric ±25% threshold, 7 break bars in 7 stocks: AMES 04-19 (−48.7%),
@@ -139,6 +140,8 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
   by the old asymmetric threshold only — moves inside the ±20% daily limit band, not breaks.)
   Backtest on `data/` (2026-10-07, 90 stocks × 100k, dividends added): 309 trades, net +68,411 EGP, 2 trades
   cancelled (EXPA, INFI → `outputs/data_breaks_log.csv`); before this policy 315 trades, +66,910.
+  2026-10-08, gaps at Close (never Open): 309 trades, **+68,746 EGP**, 2 cancelled, 7 gap exits (1 changed: MPCI
+  2026-08-10 target gap, Open 393.72 → Close 402.00, +335). Still beats B&H in 12/90 stocks → ABANDON stands.
   Correction: the 2026-10-06 note that EFID's split is "already inside data/" was wrong — the comparison used two
   Yahoo series with the same misdating.
 - **Slippage:** `RiskConfig.slippage_bps` (default 10, an assumption — no fill data yet), applied per side in

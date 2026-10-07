@@ -3,19 +3,21 @@
 Applies to `egx_4_mirrors_v3.backtest`, `backtest_optimizer` (`simulate` in both modes, `simulate_d`), `auto_sim`, and
 the H3 forward test. Implemented once in `egx_4_mirrors_v3` (`simulate_trade`, `stop_fill`, `target_fill`,
 `is_filler`, `data_breaks`); the optimizer reuses the same helpers. Tests: `test_execution.py`, `test_auto_sim.py`.
-Decided 2026-10-07 after Codex's adversarial audit and Thndr's confirmation of how its stop orders work.
+Decided 2026-10-07 after Codex's adversarial audit and Thndr's confirmation of how its stop orders work; gap rule
+changed 2026-10-08 (Ahmed, Codex W1): **Open is never used**.
 
 ## 1. Stop and target fills (Thndr stop order = market order once the level trades)
 
 | Bar after entry | Stop (sell) | Target (sell) |
 |---|---|---|
 | Level touched inside the bar | fill **at the stop** | fill **at the target** |
-| Bar opened beyond the level (gap) | fill **at the open**, if it is a real open | same |
-| …but the open is not a real price | fill **at that bar's close** | same |
+| Whole bar beyond the level (gap: High < stop, or Low > target) | fill **at that bar's Close** | same |
 
-- "Real open" = within [Low, High] and different from the previous close. Yahoo's EGX Open equals the previous close
-  on ~98% of traded bars and lies outside [Low, High] on ~18% (`KNOWN_ISSUES.md`), so most gaps fall back to the close.
-  The close is a price that actually traded that day and assumes no intraday detail we don't have.
+- **Open is never used** for any fill — not a "corrupt" Open and not an in-range one. Yahoo's EGX Open equals the
+  previous close on ~98% of traded bars and lies outside [Low, High] on ~18% (`KNOWN_ISSUES.md`), and an Open inside
+  the range is still no proof of an executable opening price. The Close is a price that certainly traded that day.
+  Test: changing only the Open column never changes a fill (`test_execution.py`).
+- Before 2026-10-08 a gap filled at an in-range Open ≠ previous close; on `data/` that applied to 1 of 7 gap exits.
 - The same bar touching both levels → stop first (conservative).
 - Entry is always the **close of the session after the signal** (signals are computed after the close; the
   signal-day close is not executable). Exits are checked from the bar after the entry bar.

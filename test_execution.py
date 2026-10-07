@@ -33,20 +33,40 @@ def test_stop_touched_inside_bar_fills_at_stop() -> None:
     assert (t["exit"], t["reason"]) == (95, "SL")
 
 
-def test_gap_down_real_open_fills_at_open() -> None:
-    t = eng.simulate_trade(_bars([SIG, FILL, (88, 92, 87, 90)]), 0, 95.0, 110.0, 2.0)
-    assert (t["exit"], t["reason"]) == (88, "SL")
+def test_gap_down_fills_at_close_whatever_the_open() -> None:  # Codex W1, Ahmed 2026-10-08: Open is never used
+    for open_ in (88, 101, 90):   # in-range ("real") Open, Open = previous close outside the bar, Open = Close
+        t = eng.simulate_trade(_bars([SIG, FILL, (open_, 92, 87, 90)]), 0, 95.0, 110.0, 2.0)
+        assert (t["exit"], t["reason"]) == (90, "SL"), open_
 
 
-def test_gap_down_fake_open_fills_at_close() -> None:
-    # Open equals the previous close (Yahoo's usual value) and sits outside the bar → not a price; use the bar's close.
-    t = eng.simulate_trade(_bars([SIG, FILL, (101, 92, 87, 90)]), 0, 95.0, 110.0, 2.0)
-    assert (t["exit"], t["reason"]) == (90, "SL")
+def test_gap_up_target_fills_at_close_whatever_the_open() -> None:
+    for open_ in (115, 101, 116):
+        assert eng.simulate_trade(_bars([SIG, FILL, (open_, 118, 113, 116)]), 0, 95.0, 110.0, 2.0)["exit"] == 116, open_
 
 
-def test_gap_up_target_real_and_fake_open() -> None:
-    assert eng.simulate_trade(_bars([SIG, FILL, (115, 118, 113, 116)]), 0, 95.0, 110.0, 2.0)["exit"] == 115
-    assert eng.simulate_trade(_bars([SIG, FILL, (101, 118, 113, 116)]), 0, 95.0, 110.0, 2.0)["exit"] == 116
+def test_changing_only_open_never_changes_execution(monkeypatch) -> None:
+    """Random OHLC paths with gaps through stops and targets; replace the Open column with random values (inside and
+    outside the bar) — every simulate_trade result and every optimizer fill must stay identical."""
+    rng = np.random.default_rng(7)
+    for _ in range(40):
+        close = 100 * np.exp(np.cumsum(rng.normal(0, 0.06, 70)))   # big moves → frequent gaps through levels
+        hi, lo = close * (1 + rng.uniform(0, 0.02, 70)), close * (1 - rng.uniform(0, 0.02, 70))
+        d = _flat(70)
+        d["Close"], d["High"], d["Low"], d["Open"] = close, hi, lo, close
+        other = d.copy()
+        other["Open"] = close * rng.uniform(0.7, 1.3, 70)
+        for i in range(0, 60, 7):
+            c = float(close[i])
+            a = eng.simulate_trade(d, i, c * 0.95, c * 1.1, c * 0.02)
+            b = eng.simulate_trade(other, i, c * 0.95, c * 1.1, c * 0.02)
+            assert a == b
+        def plan(data, i, sc):   # fixed wide entries on every bar so only execution is compared, not signal filters
+            c = float(data["Close"].iloc[i])
+            return {"entry": c, "stop": c * 0.7, "tp": c * 1.4, "atr": c * 0.02, "shares": 10,
+                    "position_value": c * 10, "risk_egp": c * 3}
+        monkeypatch.setattr(bo, "_mirrors_entry", plan)
+        ra, rb = (bo.simulate(x, bo.SCENARIOS["Baseline"], "realistic")["trades"] for x in (d, other))
+        assert len(ra) and ra.equals(rb)
 
 
 def test_zero_volume_bar_never_fills() -> None:  # Codex finding A
