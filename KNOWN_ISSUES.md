@@ -98,3 +98,32 @@ The dividend change did not move this. 4 Mirrors (Baseline) loses to B&H in ever
 Raw return vs B&H is not like-for-like (3% vs 100% invested; EGP returns inflated by devaluation — 2022-23 B&H is
 +26.6% in USD). The fair comparison, D_hold_6 in EGP and USD over 3 periods, is in `decision_report.md`:
 rule output **ABANDON (confidence MED)** — D beats B&H on USD Sharpe in 1 of 3 periods. One window ≠ another regime.
+
+## Execution conventions (red-team review 2026-10-07) — one rule set for every simulated path
+
+Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim` and the H3 forward test, via
+`egx_4_mirrors_v3.simulate_trade` / `stop_fill` / `target_fill` / `data_breaks`.
+
+- **Yahoo's EGX Open is not an opening price.** On `data/` real bars it equals the previous Close 98.2% of the time
+  and lies outside [Low, High] 18.2% of the time. No path fills at the Open any more (the old auto_sim/optimizer gap
+  fills could exit at a price the stock never traded — repro: ABUK 2026-03-08, Open 77.93 below Low 83.0).
+  `Gap_Pct` in the signal screen still uses it and is therefore close to 0 on most bars (strategy is ABANDON anyway).
+- **Entry = close of the session after the signal.** Signals are computed after the close (daily runner 14:45, data
+  cutoff 14:30), so the signal-day close is not executable. Exits are checked from the bar after the entry bar.
+- **Fills stay inside the bar:** stop → min(stop, High); target → max(target, Low). SL is checked before TP.
+- **Data breaks:** a traded bar whose move since the previous traded bar exceeds 25% per elapsed session (EGX daily
+  limits are ±20%; Yahoo filler rows count as sessions) marks an unadjusted or misdated corporate action. Trades are
+  closed at the last valid close (`DATA_BREAK`), and the scanner reports `DATA_BREAK` instead of a signal for 60 bars.
+  Found on `data/` (2025-10 → 2026-10): AFMC, AMES, CANA, EFID (2026-09-20, Yahoo dates the split 09-29), EXPA,
+  HDBK (2026-06-29, −49.6%, Yahoo dates the 2:1 split 07-08), INFI, JUFO, ORHD, RMDA, SKPC.
+  Correction: the 2026-10-06 note that EFID's split is "already inside data/" was wrong — the comparison used two
+  Yahoo series with the same misdating.
+- **Slippage:** `RiskConfig.slippage_bps` (default 10, an assumption — no fill data yet), applied per side in
+  `net_trade_pnl`; `--slippage-bps` on the engine CLI and `backtest_optimizer.py`. Paper trading (real fills) uses 0.
+  Sensitivity on `data/` (330 trades, before these changes): each 10 bps ≈ −11.4k EGP. Proposed next step once fills
+  exist: fixed + k·√(order value / 20-day traded value).
+- **Optimizer selection:** best scenario chosen on the main (`data/`) window only; 2022-23 stays out-of-sample.
+  Main-window metrics, and the trailing multiplier chosen on them, are in-sample.
+- **Fees:** Thndr tariff from `fees_config.py` (live page read 2026-10-07). Open question: Thndr's fee page says
+  "2 EGP + 0.1%", its Trader page says "0.1% with EGP 2 minimum"; the fee page (with a worked 5,000 EGP = 7 EGP
+  example) is used until a real contract note settles it.

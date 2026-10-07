@@ -20,7 +20,7 @@ def test_order_fee_tariff(value, expected):
 @pytest.mark.parametrize('value', [1000, 5000, 50000, 500000])
 @pytest.mark.parametrize('t0', [False, True])
 def test_fee_consistency_across_paths(tmp_path, value, t0):
-    risk = eng.RiskConfig(capital_gains_tax_pct=0)
+    risk = eng.RiskConfig(capital_gains_tax_pct=0, slippage_bps=0.0)  # fees only
     entered = datetime(2026, 7, 1, 12, tzinfo=ZoneInfo('Africa/Cairo'))
     exited = entered + timedelta(hours=1) if t0 else entered + timedelta(days=1)
     # Ten shares; buy and sell notionals match the stated test value.
@@ -36,7 +36,7 @@ def test_fee_consistency_across_paths(tmp_path, value, t0):
 
 @pytest.mark.parametrize('value', [1000, 5000, 50000, 500000])
 def test_optimizer_and_auto_sim_use_shared_fees(tmp_path, monkeypatch, value):
-    risk = eng.RiskConfig(capital_gains_tax_pct=0)
+    risk = eng.RiskConfig(capital_gains_tax_pct=0, slippage_bps=0.0)  # fees only
     price = value / 10
     idx = pd.date_range('2026-07-01', periods=63, tz='Africa/Cairo')
     frame = pd.DataFrame({'Open':price, 'High':price, 'Low':price, 'Close':price, 'Volume':10000.}, index=idx)
@@ -45,7 +45,7 @@ def test_optimizer_and_auto_sim_use_shared_fees(tmp_path, monkeypatch, value):
     db = tmp_path / 'auto.db'
     auto_sim.open_new(signals, idx[60].date().isoformat(), db)
     auto_data = frame.iloc[60:].copy()
-    auto_data.iloc[1, auto_data.columns.get_loc('High')] = price * 1.2
+    auto_data.iloc[2, auto_data.columns.get_loc('High')] = price * 1.2   # bar after the entry bar (next-close entry)
     monkeypatch.setattr(eng, 'with_dividends', lambda ticker, df: df)
     assert auto_sim.update_open({'ZZZ.CA':auto_data}, risk, db) == 1
     expected = eng.net_trade_pnl(price, price*1.2, 10, risk)
@@ -54,7 +54,7 @@ def test_optimizer_and_auto_sim_use_shared_fees(tmp_path, monkeypatch, value):
     plan = {'entry':price,'stop':price*.9,'tp':price*1.2,'atr':price*.05,'shares':10,
             'position_value':value,'risk_egp':value*.1}
     monkeypatch.setattr(optimizer, '_mirrors_entry', lambda data, i, sc: plan if i == 60 else None)
-    frame.loc[idx[61], 'High'] = price * 1.2
+    frame.loc[idx[62], 'High'] = price * 1.2
     for mode in ('engine', 'realistic'):
         result = optimizer.simulate(frame, optimizer.Scenario('fee-test', risk=risk), mode=mode)
         assert result['trades'].iloc[0]['pnl'] == pytest.approx(expected)
@@ -94,5 +94,6 @@ def test_signal_bar_exit_is_not_scanned(monkeypatch):
         ticker, 100, 90, 110, 5, 10, 100, 100, 1, 1000, '') if len(df)==61 else None)
     result = eng.backtest(frame, eng.SystemConfig())
     trade = result['trades'].iloc[0]
-    assert trade['Exit_Date'] == idx[61]
-    assert trade['Exit_Reason'] == 'TP'
+    # signal on bar 60 → entry at bar 61 close; neither bar is scanned for exits (bar 61 High 111 > TP 110)
+    assert trade['Entry_Date'] == idx[61] and trade['Exit_Date'] == idx[62]
+    assert trade['Exit_Reason'] == 'END'

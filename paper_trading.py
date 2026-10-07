@@ -183,7 +183,7 @@ def close_paper_trade(
 
         entry_value = float(row["entry"]) * int(row["shares"])
         exit_value = float(exit_price) * int(row["shares"])
-        risk = risk or RiskConfig(capital_gains_tax_pct=CAPITAL_GAINS_TAX)
+        risk = risk or RiskConfig(capital_gains_tax_pct=CAPITAL_GAINS_TAX, slippage_bps=0.0)  # real fills: no slippage model
         t0 = same_session(row['entry_time'], exit_time)
         commission = trade_fees(float(row['entry']), float(exit_price), int(row['shares']), risk,
                                 same_session=t0, entry_fills=entry_fills, exit_fills=exit_fills)
