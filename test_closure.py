@@ -23,6 +23,7 @@ from zoneinfo import ZoneInfo
 warnings.filterwarnings("ignore")
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import pandas as pd  # noqa: E402
 import egx_4_mirrors_v3 as eng  # noqa: E402
 import validate_tv_signals as tv  # noqa: E402
 
@@ -52,19 +53,27 @@ def daily_runner_tests() -> None:
     report, log_file = HERE / "reports" / f"daily_{today}.xlsx", HERE / "logs" / f"daily_{today}.log"
     before = db_snapshot(REAL_DB)
     with tempfile.TemporaryDirectory() as empty:
-        for label, folder, expect_stocks in (("data", "./data", 9), ("data_2022_2023", "./data_2022_2023", 9), ("empty folder", empty, 0)):
+        # The session is pinned to the folder's own last candle (EGX_EXPECTED_SESSION), so the result does not depend on
+        # the wall clock or on Yahoo having published today's bar. data/ must complete; the other two must be blocked by
+        # the data-health gate (exit 2): data_2022_2023 holds 9 of the 90 required tickers, the empty folder none.
+        for label, folder, expect_exit in (("data", "./data", 0), ("data_2022_2023", "./data_2022_2023", 2), ("empty folder", empty, 2)):
+            csvs = sorted((HERE / folder if not Path(folder).is_absolute() else Path(folder)).glob("*.csv"))
+            last = max((pd.read_csv(f, usecols=["Date"])["Date"].iloc[-1][:10] for f in csvs), default="2026-10-01")
             start = time.time()
             log_size = log_file.stat().st_size if log_file.exists() else 0
             proc = subprocess.run([sys.executable, "-W", "ignore", "daily_runner.py", "--data-folder", folder, "--capital", "100000",
-                                   "--no-telegram", "--dry-run"], cwd=HERE, env=CLEAN_ENV, capture_output=True, text=True, encoding="utf-8", timeout=900)
+                                   "--no-telegram", "--dry-run"], cwd=HERE, env={**CLEAN_ENV, "EGX_EXPECTED_SESSION": last},
+                                  capture_output=True, text=True, encoding="utf-8", timeout=900)
             new_log = log_file.read_text(encoding="utf-8")[log_size:] if log_file.exists() else ""
             done = next((ln for ln in new_log.splitlines() if "EGX daily run completed" in ln), "")
             stocks = int(done.split("stocks=")[1].split()[0]) if done else -1
-            check(f"daily_runner --dry-run [{label}]",
-                  proc.returncode == 0 and stocks == expect_stocks and report.exists() and report.stat().st_mtime >= start
-                  and "Telegram send skipped" in new_log and "outcome evaluation skipped" in new_log,
-                  f"exit={proc.returncode} stocks={stocks} xlsx_fresh={report.exists() and report.stat().st_mtime >= start} "
-                  f"completed='{done[-90:]}' stderr_tail={proc.stderr[-160:]!r}")
+            if expect_exit == 0:
+                ok = (proc.returncode == 0 and stocks == len(csvs) and report.exists() and report.stat().st_mtime >= start
+                      and "Telegram send skipped" in new_log and "outcome evaluation skipped" in new_log)
+            else:
+                ok = proc.returncode == 2 and "Analysis blocked by data health" in new_log + proc.stderr
+            check(f"daily_runner --dry-run [{label}] (session pinned to {last})", ok,
+                  f"exit={proc.returncode} stocks={stocks} completed='{done[-90:]}' stderr_tail={proc.stderr[-160:]!r}")
     after = db_snapshot(REAL_DB)
     check("egx_signals.db unchanged by dry-runs (sha256 + row counts)", before == after, f"rows={after[1]}")
 
@@ -173,6 +182,10 @@ def main() -> int:
     passed = sum(ok for _, ok, _ in results)
     print(f"\nRESULT {passed}/{len(results)} passed")
     return 0 if passed == len(results) else 1
+
+
+def test_script_suite() -> None:  # pytest entry point: every check above must pass
+    assert main() == 0
 
 
 if __name__ == "__main__":

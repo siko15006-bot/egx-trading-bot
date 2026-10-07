@@ -146,12 +146,16 @@ def main() -> int:
         text = " ".join(str(m.value) for m in at.markdown)
         sections = all(k in text for k in ("اشتري الآن", "انتظر", "بيع")) if source else True
         check(f"dashboard tab 9 [{label}]", len(at.exception) == 0 and len(labels) == 10
-              and labels[8] == "🎯 إشارات اليوم" and labels[9] == "📝 Paper Trading" and sections,
+              and labels[8] == "🎯 إشارات اليوم" and labels[9] == "📝 تداول ورقي" and sections,
               f"tabs={len(labels)} exceptions={[str(e.value)[:150] for e in at.exception]}")
 
     passed = sum(ok for _, ok, _ in results)
     print(f"\nRESULT {passed}/{len(results)} passed")
     return 0 if passed == len(results) else 1
+
+
+def test_script_suite() -> None:  # pytest entry point: every check above must pass
+    assert main() == 0
 
 
 if __name__ == "__main__":

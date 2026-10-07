@@ -211,5 +211,9 @@ def main() -> int:
     return 0 if passed == len(results) else 1
 
 
+def test_script_suite() -> None:  # pytest entry point: every check above must pass
+    assert main() == 0
+
+
 if __name__ == "__main__":
     sys.exit(main())

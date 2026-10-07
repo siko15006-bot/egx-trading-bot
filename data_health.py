@@ -20,6 +20,9 @@ class DataHealthError(RuntimeError):
 
 def expected_session(now: datetime | None = None, *, holidays: Iterable[date] | None = None) -> date:
     # تقويم أسبوعي فقط؛ الإجازات يجب توثيقها في الإعدادات، لا تخمينها.
+    pinned = os.getenv("EGX_EXPECTED_SESSION")  # tests only: pin the session instead of reading the wall clock
+    if now is None and pinned:
+        return date.fromisoformat(pinned)
     clock = now or datetime.now(CAIRO)
     clock = clock.replace(tzinfo=CAIRO) if clock.tzinfo is None else clock.astimezone(CAIRO)
     cutoff = time.fromisoformat(os.getenv("EGX_DATA_CUTOFF", "14:30"))
