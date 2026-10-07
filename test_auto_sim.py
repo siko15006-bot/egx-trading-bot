@@ -67,6 +67,29 @@ def test_update_closes_with_engine_pnl() -> None:
     assert "ABANDON" in auto_sim.summary_line(db) and "مغلقة: 1" in auto_sim.summary_line(db)
 
 
+def test_closed_trade_pnl_matches_hand_computation(monkeypatch) -> None:
+    """Independent oracle (Codex W2): every number below is computed by hand from the tariff in fees_config.py, not by
+    eng.net_trade_pnl. 100 shares, entry = next close 10, exit = TP 12 touched inside the bar, overnight, tax 10%.
+    Fees per order = brokerage 2 + 0.1% + EGX 0.01% + MCDR 0.01% + FRA max(1, 0.005%) + insurance 0.005% + stamp 0.05%.
+      0 bps:  buy 1,000.00 → 3.00+0.10+0.10+1.00+0.05+0.50 = 4.75; sell 1,200.00 → 3.20+0.12+0.12+1.00+0.06+0.60 = 5.10
+              pre-tax 1,200 − 1,000 − 4.75 − 5.10 = 190.15; tax 19.015 → 171.135
+      10 bps: buy 10.01 → 1,001.00, fees 3.001+0.1001+0.1001+1.00+0.05005+0.5005 = 4.75175;
+              sell 11.988 → 1,198.80, fees 3.1988+0.11988+0.11988+1.00+0.05994+0.5994 = 5.0979
+              pre-tax 1,198.80 − 1,001.00 − 4.75175 − 5.0979 = 187.95035; tax 18.795035 → 169.155315"""
+    monkeypatch.setattr(eng, "with_dividends", lambda ticker, df: df)   # no dividends in this example
+    signal = pd.DataFrame([{"Ticker": "HND.CA", "Status": "BUY", "Entry": 10.0, "SL": 9.0, "TP": 12.0, "ATR": 0.5,
+                            "Shares": 100, "RR_Net": 2.0}])
+    bars = _bars([(10, 10, 10, 10), (10, 10.1, 9.9, 10), (10.5, 12.5, 10.4, 12.2)])
+    for bps, expected in ((0.0, 171.135), (10.0, 169.155315)):
+        db = Path(tempfile.mkdtemp()) / "t.db"
+        auto_sim.open_new(signal, "2026-09-01", db)
+        risk = eng.RiskConfig(slippage_bps=bps, capital_gains_tax_pct=0.10)
+        assert auto_sim.update_open({"HND.CA": bars}, risk, db) == 1
+        row = auto_sim.load(db).iloc[0]
+        assert (row.entry, row.exit_price, row.exit_reason) == (10, 12, "TP")
+        assert abs(row.pnl_egp - expected) < 1e-6, (bps, row.pnl_egp, expected)
+
+
 def test_data_break_cancels_without_pnl() -> None:
     db = Path(tempfile.mkdtemp()) / "t.db"
     auto_sim.open_new(_signals(("ZZZ.CA", 2.0)), "2026-09-01", db)

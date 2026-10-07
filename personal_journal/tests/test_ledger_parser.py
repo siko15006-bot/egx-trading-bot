@@ -30,11 +30,29 @@ assert Path(parser.__file__).resolve().is_relative_to(REPO / "personal_journal")
 assert Path(schema.__file__).resolve().is_relative_to(REPO / "personal_journal")
 
 
+# Explicitly deferred work (Codex W8, 2026-10-08): only these may raise NotImplementedError and be SKIPPED.
+# Any other NotImplementedError is a FAIL, so a function that silently stops working can never hide as a skip.
+DEFERRED = {
+    ("parse_rows", "csv"): "Thndr statements are PDF; no real CSV export seen yet — these fixtures are hypothetical",
+    ("parse_rows", "xlsx"): "no real Thndr XLSX export seen yet",
+    ("fifo_round_trips", None): "FIFO round trips: next step after the statements are complete",
+    ("average_cost", None): "average cost: built with FIFO",
+}
+
+
+def deferred_reason(name, args):
+    fmt = args[1] if name == "parse_rows" and len(args) > 1 else None
+    return DEFERRED.get((name, fmt))
+
+
 def invoke(function, *args, **kwargs):
     try:
         return function(*args, **kwargs)
     except NotImplementedError as exc:
-        raise unittest.SkipTest("NOT IMPLEMENTED: " + function.__name__ + ": " + str(exc))
+        reason = deferred_reason(function.__name__, args)
+        if reason is None:
+            raise AssertionError(f"unexpected NotImplementedError from {function.__name__}: {exc}") from exc
+        raise unittest.SkipTest(f"DEFERRED: {function.__name__}: {reason}")
 
 
 def dec(value):
@@ -80,11 +98,8 @@ class ParserAcceptance(unittest.TestCase):
         path = SAMPLES / case["file"]
         before = path.read_bytes()
         if case["error"]:
-            try:
-                with self.assertRaisesRegex(ValueError, case["error"]):
-                    parser.parse_rows(path, "csv")
-            except NotImplementedError as exc:
-                self.skipTest("NOT IMPLEMENTED: parse_rows: " + str(exc))
+            with self.assertRaisesRegex(ValueError, case["error"]):
+                invoke(parser.parse_rows, path, "csv")
         else:
             result = invoke(parser.parse_rows, path, "csv")
             self.assert_normalized(result, case["expected"])
