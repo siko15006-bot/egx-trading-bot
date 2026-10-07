@@ -64,7 +64,8 @@ def daily_runner_tests() -> None:
             proc = subprocess.run([sys.executable, "-W", "ignore", "daily_runner.py", "--data-folder", folder, "--capital", "100000",
                                    "--no-telegram", "--dry-run"], cwd=HERE, env={**CLEAN_ENV, "EGX_EXPECTED_SESSION": last},
                                   capture_output=True, text=True, encoding="utf-8", timeout=900)
-            new_log = log_file.read_text(encoding="utf-8")[log_size:] if log_file.exists() else ""
+            # slice bytes, not text: read_text turns CRLF into LF, so a byte offset would skip the new lines on Windows
+            new_log = log_file.read_bytes()[log_size:].decode("utf-8", errors="replace") if log_file.exists() else ""
             done = next((ln for ln in new_log.splitlines() if "EGX daily run completed" in ln), "")
             stocks = int(done.split("stocks=")[1].split()[0]) if done else -1
             if expect_exit == 0:

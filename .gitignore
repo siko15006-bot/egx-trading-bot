@@ -35,3 +35,4 @@ Thumbs.db
 personal_journal/prices/*
 !personal_journal/prices/.gitkeep
 personal_journal/statements/
+outputs/

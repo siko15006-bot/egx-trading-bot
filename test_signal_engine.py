@@ -101,7 +101,15 @@ def main() -> int:
         path = Path(tmp) / "portfolio.csv"
         se.save_portfolio(pf, path)
         back = se.load_portfolio(path)
-        check("portfolio save/load roundtrip", len(back) == len(pf) and list(back.columns) == se.PORTFOLIO_COLUMNS and not path.with_suffix(".tmp").exists())
+        try:  # values, not just shape: a load that zeroes the numbers must fail (Codex audit)
+            text = ["ticker", "entry_date", "notes"]   # CSV cannot tell "" from missing; numbers must match exactly
+            norm = lambda f: f[se.PORTFOLIO_COLUMNS].reset_index(drop=True).fillna({c: "" for c in text})
+            pd.testing.assert_frame_equal(norm(back), norm(pf), check_dtype=False)
+            same = True
+        except AssertionError as err:
+            same, diff = False, str(err)[:200]
+        check("portfolio save/load roundtrip", same and list(back.columns) == se.PORTFOLIO_COLUMNS and not path.with_suffix(".tmp").exists(),
+              "" if same else diff)
         check("missing portfolio file -> empty frame", se.load_portfolio(Path(tmp) / "nope.csv").empty)
 
         # 7) تيليجرام: رسالة فاضية → None، escaping، ومنع التكرار في نفس اليوم (stub بدل الإرسال الحقيقي)
@@ -128,7 +136,8 @@ def main() -> int:
         data = eng.calculate_indicators(d)
         ev = eng.evaluate_4_mirrors(data, SIG)
         status[t] = f"{ev['signal']} {sum(ev['mirrors'].values())}/4"
-    check("real data scan (informational)", True, f"as_of={s.as_of} buy={len(s.buy)} watch={len(s.watch)} mirrors={status}")
+    check("real data scan: every ticker evaluated, BUY/WATCH subsets of the universe", len(status) == len(real) > 0 and bool(s.as_of)
+          and set(s.buy.get("Ticker", [])) <= set(real) and set(s.watch.get("Ticker", [])) <= set(real), f"as_of={s.as_of} buy={len(s.buy)} watch={len(s.watch)} mirrors={status}")
 
     # 9) تبويب 9 في الداشبورد (AppTest): حقيقي + Demo + بدون بيانات
     from streamlit.testing.v1 import AppTest

@@ -77,3 +77,10 @@ def test_without_alert_after_behaviour_is_unchanged(env):
     run, calls, _ = env
     rc, health = run("14:45", None)
     assert rc == 2 and len(calls["telegram"]) == 1 and "retry_exhausted" not in health
+
+
+def test_two_final_retries_send_one_alert(env):  # Codex missing test 18: the scheduler may fire 19:45 twice
+    run, calls, _ = env
+    run("19:45", "19:30")
+    rc, health = run("19:50", "19:30")
+    assert rc == 2 and len(calls["telegram"]) == 1 and health["retry_exhausted"] is True

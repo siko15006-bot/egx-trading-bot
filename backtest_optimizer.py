@@ -7,12 +7,13 @@ v2 من الملف ده (النسخة القديمة في outputs_backup_2026100
     - Trailing لسيناريو C قابل للضبط (2/3/4×ATR) والاختيار بأعلى Profit Factor.
     - سيناريو D (Signal-Based Buy & Hold): محفظة واحدة برأس مال مشترك، دخول على إشارة C، خروج بإغلاق تحت EMA50،
       وقف أمان −15%، حجم المركز حتى 15% من رأس المال، 4–6 مراكز متزامنة كحد أقصى.
-المحفظة في A/B/C/Baseline: 9 حسابات مستقلة × 100,000 (900,000)؛ D حساب واحد 900,000؛ Buy & Hold أوزان متساوية.
+المحفظة في A/B/C/Baseline: حساب مستقل 100,000 لكل سهم؛ D حساب واحد بنفس الإجمالي؛ Buy & Hold أوزان متساوية.
 
 التشغيل: python backtest_optimizer.py  →  optimization_report_v2.md + logs/optimization_v2_<date>.log
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from dataclasses import dataclass, field, replace
@@ -119,17 +120,19 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
     i = start
     n = len(data)
     breaks = eng.data_breaks(data)
+    cancelled: list[dict[str, Any]] = []
     while i < n - 1:
         plan = entry_fn(data, i, sc)
         if plan is None:
             i += 1
             continue
         initial_stop, tp, atr = plan["stop"], plan["tp"], plan["atr"]
-        # Same execution conventions as eng.simulate_trade: entry at the close after the signal, in-range fills,
-        # no Open (not a real opening price in this data), no trade across a data break. `mode` no longer differs.
+        # Same execution policy as eng.simulate_trade (docs/execution_policy.md): entry at the close after the signal on a
+        # traded bar, filler bars never fill, stop/target fills via eng.stop_fill/target_fill, and a data break while
+        # open cancels the trade (counted, excluded). `mode` no longer differs.
         e = i + 1
         entry = float(data["Close"].iloc[e])
-        if breaks[e] or not initial_stop < entry < tp:
+        if breaks[e] or eng.is_filler(data.iloc[e]) or not initial_stop < entry < tp:
             i += 1
             continue
         stop = initial_stop
@@ -138,14 +141,16 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
         for j in range(e + 1, n):
             row = data.iloc[j]
             if breaks[j]:
-                exit_price, exit_index, reason = float(data["Close"].iloc[j - 1]), j - 1, "DATA_BREAK"
+                reason, exit_index = "DATA_BREAK", j
                 break
+            if eng.is_filler(row):
+                continue
             if row["Low"] <= stop:
-                exit_price, exit_index = eng.stop_fill(row, stop), j
+                exit_price, exit_index = eng.stop_fill(data, j, stop), j
                 reason = "TRAIL_SL" if stop > initial_stop else "SL"
                 break
             if row["High"] >= tp:
-                exit_price, exit_index, reason = eng.target_fill(row, tp), j, "TP"
+                exit_price, exit_index, reason = eng.target_fill(data, j, tp), j, "TP"
                 break
             if sc.kind == "trend":
                 if row["Close"] < row["EMA_20"]:                         # كسر EMA20 بالإغلاق
@@ -161,8 +166,12 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
             if sc.time_stop_days is not None and (j - e) >= sc.time_stop_days:
                 exit_price, exit_index, reason = float(row["Close"]), j, "TIME_STOP"
                 break
+        if reason == "DATA_BREAK":   # outcome unknown: excluded from P&L and stats, counted
+            cancelled.append({"entry_date": data.index[e], "break_date": data.index[exit_index], "entry": entry})
+            i = exit_index
+            continue
         if reason != "END":
-            assert exit_index > e or reason == "DATA_BREAK", "look-ahead: exit on the entry bar"
+            assert exit_index > e, "look-ahead: exit on the entry bar"
         i = e  # entry bar index from here on (P&L, exposure, dividends, trade record)
         pnl = eng.net_trade_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk, eng.dividends_between(data, i, exit_index),
                                 same_session=eng.same_session(data.index[i], data.index[exit_index]))
@@ -178,14 +187,15 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
     equity_curve = capital + daily_pnl.loc[span].cumsum()
     bh_curve = eng.buy_hold_curve(data, start, capital, sc.risk)
     return {"trades": pd.DataFrame(trades), "equity": equity_curve, "bh": bh_curve, "final": equity,
-            "exposure": exposure.loc[span]}
+            "exposure": exposure.loc[span], "cancelled": pd.DataFrame(cancelled)}
 
 
 # ------------------------------------------------------------------ سيناريو D: محفظة مشتركة
 def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, start_date: Optional[str] = None,
                pos_pct: float = 0.15, sl_pct: float = 0.15) -> dict[str, Any]:
     """Signal-Based Buy & Hold: دخول عند إغلاق الجلسة اللي بعد إشارة C، خروج بإغلاق < EMA50 أو وقف −15%
-    (تنفيذ جوه مدى الشمعة، من غير Open). لا Trailing ولا هدف. أي سهم فيه data break بيتقفل على آخر إغلاق سليم."""
+    (docs/execution_policy.md: الوقف بأمر سوق، مفيش تنفيذ على شمعة حجمها صفر). لا Trailing ولا هدف.
+    مركز بيعدّي data break بيتلغي: الكاش بيرجع لتكلفته ومش بيتسجل كصفقة (معدود في cancelled)."""
     sc = SCENARIOS["C_trend"]
     risk = sc.risk
     ind = {t: eng.calculate_indicators(df) for t, df in data_map.items()}
@@ -198,6 +208,7 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
     dates = sorted(set().union(*(d.index[_start(d, start_date):] for d in ind.values())))
     cash, pos, last_close = capital, {}, {}
     trades: list[dict[str, Any]] = []
+    cancelled: list[dict[str, Any]] = []
     curve, invested = {}, {}
 
     def close_position(t: str, ts: pd.Timestamp, px: float, why: str) -> None:
@@ -219,11 +230,14 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
             if ts not in d.index:
                 continue
             row, stop = d.loc[ts], pos[t]["stop"]
-            if brk[t].loc[ts]:
-                prev = d.index[d.index.get_loc(ts) - 1]
-                close_position(t, prev, float(d.at[prev, "Close"]), "DATA_BREAK")
+            if brk[t].loc[ts]:   # outcome unknown → undo the position (cash back to its cost); earlier curve points keep
+                p = pos.pop(t)   # its mark-to-market, a documented limitation
+                cash += p["cost"]
+                cancelled.append({"ticker": t, "entry_date": p["ts"], "break_date": ts, "entry": p["entry"]})
+            elif eng.is_filler(row):
+                continue
             elif row["Low"] <= stop:
-                close_position(t, ts, eng.stop_fill(row, stop), "SL")
+                close_position(t, ts, eng.stop_fill(d, d.index.get_loc(ts), stop), "SL")
             elif row["Close"] < row["EMA_50"]:
                 close_position(t, ts, float(row["Close"]), "EMA50_EXIT")
         for t, d in ind.items():
@@ -237,7 +251,7 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
                 continue
             row = ind[t].loc[ts]
             px = float(row["Close"])
-            if brk[t].loc[ts]:
+            if brk[t].loc[ts] or eng.is_filler(row):
                 continue
             budget = min(pos_pct * equity, cash)
             shares = int(min(budget // px, floor(risk.max_avg_volume_pct * float(row["Volume_SMA20"]))))
@@ -254,10 +268,12 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
         curve[ts], invested[ts] = cash + held, held / (cash + held)
     for t in list(pos):   # مراكز مفتوحة في النهاية → تقييم على آخر إغلاق (END)
         close_position(t, ind[t].index[-1], float(ind[t]["Close"].iloc[-1]), "END")
+    if curve:   # the last curve point must include the END liquidation costs (fees, tax, slippage)
+        curve[max(curve)] = cash
     tr = pd.DataFrame(trades)
     if len(tr):
         assert (tr.loc[tr.reason != "END", "bars"] >= 1).all(), "look-ahead: exit on the entry bar"
-    return {"trades": tr, "equity": pd.Series(curve), "exposure": pd.Series(invested)}
+    return {"trades": tr, "equity": pd.Series(curve), "exposure": pd.Series(invested), "cancelled": pd.DataFrame(cancelled)}
 
 
 # ------------------------------------------------------------------ مقاييس
@@ -330,9 +346,11 @@ def run_suite(data_map: dict[str, pd.DataFrame], scenarios: dict[str, Scenario],
 
 def main() -> int:
     global SCENARIOS
-    if "--slippage-bps" in sys.argv:  # cost per side on top of fees, applied to every scenario
-        bps = float(sys.argv[sys.argv.index("--slippage-bps") + 1])
-        SCENARIOS = {k: replace(v, risk=replace(v.risk, slippage_bps=bps)) for k, v in SCENARIOS.items()}
+    ap = argparse.ArgumentParser(description="EGX optimizer (see module docstring)")
+    ap.add_argument("--slippage-bps", type=float, default=None, help="cost per side on top of fees, 0..1000")
+    args = ap.parse_args()
+    if args.slippage_bps is not None:  # applied to every scenario; RiskConfig rejects values outside 0..1000
+        SCENARIOS = {k: replace(v, risk=replace(v.risk, slippage_bps=args.slippage_bps)) for k, v in SCENARIOS.items()}
     log_path = HERE / "logs" / f"optimization_v2_{datetime.now():%Y%m%d}.log"
 
     def log(msg: str) -> None:
@@ -444,8 +462,8 @@ def _table(runs: dict, bh: dict) -> list[str]:
 def build_report(trail: dict, best_trail: float, main_runs: dict, main_bh: dict, full_runs: dict, full_bh: dict,
                  trough_runs: dict, trough_bh: dict, fx_move: float, best: str, rec: str, same_bar: int) -> str:
     L = [f"# Optimization Report v2 — 4 Mirrors v3 + Hybrid (generated {datetime.now():%Y-%m-%d %H:%M})", "",
-         "Execution is **realistic for every number in this report**: first possible exit = the bar after the signal; gaps through a stop/target fill at the open. "
-         "A/B/C/Baseline = 9 independent 100,000 EGP accounts; D = one shared 900,000 EGP account; Buy & Hold = equal weight, same window.", "",
+         "Execution is **realistic for every number in this report**: entry at the close after the signal, first exit on the bar after that; fills per `docs/execution_policy.md` (level, real open on a gap, else close; zero-volume rows never fill; trades across a data break cancelled). "
+         "A/B/C/Baseline = one independent 100,000 EGP account per stock; D = one shared account of the same total; Buy & Hold = equal weight, same window.", "",
          "## 1.2 Look-ahead", "",
          f"The simulator in engine logic reproduces `egx_4_mirrors_v3.backtest()` exactly; that logic had **{same_bar} exits on the entry bar**. "
          "Realistic mode starts exit checks at the next bar and asserts that no non-END trade exits on its entry bar (assertion never fired).", "",
@@ -466,11 +484,12 @@ def build_report(trail: dict, best_trail: float, main_runs: dict, main_bh: dict,
         L.append(f"| {key} | {_fmt(r['total_return'])} | {_fmt((1 + r['total_return']) / fx_move - 1)} |")
     bm = main_runs[best]["metrics"]
     L += ["", "## Decision", "",
-          f"Best scenario = highest *minimum* Sharpe across data/ and 2022–2023: **{best}** (data/: Sharpe {bm['sharpe']:.2f}, PF {_fmt(bm['profit_factor'], False)}; "
+          f"Best scenario = highest Sharpe on data/ only (in-sample); 2022–2023 is reported as an out-of-sample check on 9 large caps: **{best}** (data/: Sharpe {bm['sharpe']:.2f}, PF {_fmt(bm['profit_factor'], False)}; "
           f"2022–23: Sharpe {full_runs[best]['metrics']['sharpe']:.2f}).", "",
           "Disclosure: the first run selected by data/ Sharpe alone and picked B_risk (Sharpe 1.70 on ~3% deployed capital), which fell to Sharpe 0.39 / "
           "P(mean R ≤ 0) 29% in 2022–2023 → rule output ABANDON. That selection overfits one period, so it was changed to the two-period minimum *after* "
-          "seeing that result. The CONTINUE/PIVOT/ABANDON rule itself is unchanged.", "",
+          "seeing that result. The CONTINUE/PIVOT/ABANDON rule itself is unchanged. 2026-10-07: reverted to data/-only selection, because "
+          "a two-period minimum lets the out-of-sample period choose the winner; overfitting now shows up in the 2022–2023 numbers instead.", "",
           "Rule fixed before reading the results: CONTINUE if the best scenario beats Buy & Hold on Sharpe in both periods; "
           "PIVOT (use the system as a filter/timing layer) if its per-trade edge is significant (P(mean R ≤ 0) < 5%) in both periods but it loses to Buy & Hold; otherwise ABANDON.", "",
           f"**Recommendation: {rec}**", ""]

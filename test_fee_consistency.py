@@ -48,7 +48,10 @@ def test_optimizer_and_auto_sim_use_shared_fees(tmp_path, monkeypatch, value):
     auto_data.iloc[2, auto_data.columns.get_loc('High')] = price * 1.2   # bar after the entry bar (next-close entry)
     monkeypatch.setattr(eng, 'with_dividends', lambda ticker, df: df)
     assert auto_sim.update_open({'ZZZ.CA':auto_data}, risk, db) == 1
-    expected = eng.net_trade_pnl(price, price*1.2, 10, risk)
+    # independent oracle: gross gain minus the fee tariff (tax 0, slippage 0) — not eng.net_trade_pnl, which every
+    # path shares and so cannot check itself (Codex audit: a constant-PnL mutation survived the old assertion)
+    expected = value * 0.2 - round_trip_fees(value, value * 1.2, same_session=False)
+    assert expected == pytest.approx(eng.net_trade_pnl(price, price*1.2, 10, risk))
     assert auto_sim.load(db).iloc[0]['pnl_egp'] == pytest.approx(expected)
     monkeypatch.setattr(eng, 'calculate_indicators', lambda df: df)
     plan = {'entry':price,'stop':price*.9,'tp':price*1.2,'atr':price*.05,'shares':10,
