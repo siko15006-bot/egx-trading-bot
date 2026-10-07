@@ -133,3 +133,13 @@ T0 refund; asserts on parsed fills, FIFO round trips, fee recomputation and the 
 - `company_names.json`: sections `companies`, `funds`, `_unresolved` (names whose ticker could not be verified — the
   parser stops on them and quotes the note). `analytics.fund_summary()` reports funds apart from stocks.
 - E-INVOICE (per-trade contract note, itemised fees) is recognised and refused: separate parser later.
+
+## Goal change (Ahmed, 2026-10-07)
+
+The ledger judges **the project's signals**, not Ahmed: he trades only on system signals (Telegram channels, EGXBot,
+H3, scanner). `analytics.attribute_sources` is therefore the core of the ledger, not a side metric — per source:
+signal count, share followed, net result of followed trips, and "followed every signal" vs "what was actually done".
+Prerequisites, not started (no new modules yet): every signal stored with source, time, ticker, direction and price
+(today only `tg_signals` for one channel and `h3_forward` exist; `tg_raw` holds EGXBot text, not parsed signals);
+a signal parser for Telegram text; a signal↔trip link table. Matching rule unchanged (same ticker, preceding 2
+sessions). Note: statements have no time of day, so "preceding 2 sessions" is counted in whole sessions.
