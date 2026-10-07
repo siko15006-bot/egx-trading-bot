@@ -95,6 +95,20 @@ def message_for(group: str, history: str, sig: dict, raw: str) -> str:
             f"ℹ️ سجل القناة: {history}\n⚠️ مش نصيحة استثمار — القرار والتنفيذ على Thndr ليك.")
 
 
+# Record only, never forwarded: Ahmed already gets these directly. Scored later on the full record (signals + stops),
+# not on the "target hit" messages alone.
+RECORD_ONLY = {"egx_stock_analyzer_bot": "EGXBot"}
+
+
+def store_raw(source: str, msg_id: int, date: str, raw: str) -> bool:
+    with closing(sqlite3.connect(_db_path())) as con:
+        con.execute("""CREATE TABLE IF NOT EXISTS tg_raw (src TEXT, msg_id INTEGER, date TEXT, raw TEXT,
+            PRIMARY KEY (src, msg_id))""")
+        cur = con.execute("INSERT OR IGNORE INTO tg_raw VALUES (?, ?, ?, ?)", (source, msg_id, date, raw))
+        con.commit()
+        return bool(cur.rowcount)
+
+
 def store(group: str, msg_id: int, idx: int, date: str, sig: dict, raw: str) -> bool:
     with closing(sqlite3.connect(_db_path())) as con:
         con.execute("""CREATE TABLE IF NOT EXISTS tg_signals (id INTEGER PRIMARY KEY AUTOINCREMENT, grp TEXT, msg_id INTEGER,
@@ -129,7 +143,20 @@ def main() -> int:
                 send_telegram(message_for(group, history, sig, raw))
                 LOGGER.info("forwarded %s %s", group, sig.get("ticker"))
 
+    @client.on(events.NewMessage(chats=list(RECORD_ONLY), incoming=True))
+    async def on_record(event) -> None:
+        source = RECORD_ONLY[(await event.get_chat()).username]
+        if store_raw(source, event.message.id, event.message.date.isoformat(), event.message.message or ""):
+            LOGGER.info("recorded %s %s", source, event.message.id)
+
     client.start()  # uses the saved session; never prompts when tg_egx.session is valid
+    async def backfill() -> None:  # anything received while the follower was down
+        for username, source in RECORD_ONLY.items():
+            async for m in client.iter_messages(username, limit=500):
+                if m.message and not m.out:
+                    store_raw(source, m.id, m.date.isoformat(), m.message)
+
+    client.loop.run_until_complete(backfill())
     LOGGER.info("following %s", [g for g, _ in GROUPS.values()])
     client.run_until_disconnected()
     return 0
