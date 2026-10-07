@@ -95,9 +95,15 @@ def message_for(group: str, history: str, sig: dict, raw: str) -> str:
             f"ℹ️ سجل القناة: {history}\n⚠️ مش نصيحة استثمار — القرار والتنفيذ على Thndr ليك.")
 
 
-# Record only, never forwarded: Ahmed already gets these directly. Scored later on the full record (signals + stops),
-# not on the "target hit" messages alone.
+# Bots Ahmed subscribes to: every message is stored in tg_raw and forwarded so all signals arrive in one chat
+# (Ahmed asked for that on 2026-10-07). Scored later on the full record (signals + stops), not on "target hit" alone.
 RECORD_ONLY = {"egx_stock_analyzer_bot": "EGXBot"}
+_MENU = ("مرحباً بك", "اختر من القائمة")  # bot menus / greetings are stored but not forwarded
+
+
+def bot_message(source: str, raw: str) -> str:
+    return (f"📡 <b>{html.escape(source)}</b>\n\n{html.escape(raw[:3000])}\n\n"
+            f"ℹ️ سجل {html.escape(source)} لسه بيتقاس (من 2026-10-06). ⚠️ مش نصيحة استثمار — القرار ليك.")
 
 
 def store_raw(source: str, msg_id: int, date: str, raw: str) -> bool:
@@ -146,7 +152,10 @@ def main() -> int:
     @client.on(events.NewMessage(chats=list(RECORD_ONLY), incoming=True))
     async def on_record(event) -> None:
         source = RECORD_ONLY[(await event.get_chat()).username]
-        if store_raw(source, event.message.id, event.message.date.isoformat(), event.message.message or ""):
+        raw = event.message.message or ""
+        if store_raw(source, event.message.id, event.message.date.isoformat(), raw):  # once per message
+            if raw.strip() and not any(k in raw for k in _MENU):
+                send_telegram(bot_message(source, raw))
             LOGGER.info("recorded %s %s", source, event.message.id)
 
     client.start()  # uses the saved session; never prompts when tg_egx.session is valid
@@ -175,6 +184,7 @@ def _selftest() -> None:
     assert parse("شراء ومستهدف ووقف من غير أرقام") == [{"ticker": None}]
     msg = message_for("الأسهم النارية", "x", m[0], "")
     assert "RMDA" in msg and "راميدا" in msg and "مش نصيحة" in msg
+    assert "EGXBot" in bot_message("EGXBot", "<b>x</b>") and "&lt;b&gt;" in bot_message("EGXBot", "<b>x</b>")
     print("tg_follower self-test OK")
 
 
