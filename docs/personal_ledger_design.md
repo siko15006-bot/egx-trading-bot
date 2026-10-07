@@ -140,6 +140,7 @@ The ledger judges **the project's signals**, not Ahmed: he trades only on system
 H3, scanner). `analytics.attribute_sources` is therefore the core of the ledger, not a side metric — per source:
 signal count, share followed, net result of followed trips, and "followed every signal" vs "what was actually done".
 Prerequisites, not started (no new modules yet): every signal stored with source, time, ticker, direction and price
-(today only `tg_signals` for one channel and `h3_forward` exist; `tg_raw` holds EGXBot text, not parsed signals);
-a signal parser for Telegram text; a signal↔trip link table. Matching rule unchanged (same ticker, preceding 2
+(today: `tg_follower` already parses 4 groups into `tg_signals` — ticker, entry range, targets, stop; `h3_forward`
+stores each rebalance's top 10; the scanner writes `daily_reports`; EGXBot is stored as raw text in `tg_raw` only);
+a parser for EGXBot's text; a direction/price field common to all sources; a signal↔trip link table. Matching rule unchanged (same ticker, preceding 2
 sessions). Note: statements have no time of day, so "preceding 2 sessions" is counted in whole sessions.
