@@ -2,6 +2,8 @@
 every concern is verified with evidence and tests before any change (see docs/personal_ledger_design.md workflow).
 
 Setup (Ahmed, once): create a key at https://aistudio.google.com, add GEMINI_API_KEY=... to C:\\Projects\\EGX\\.env.
+Model: GEMINI_MODEL in .env, no default in code (models get retired: on 2026-10-07 gemini-2.5-pro/flash were closed
+to new users and the free tier gave 0 requests on 3.1-pro; gemini-3.1-flash-lite worked).
 Run:   python scripts/review_with_gemini.py [--commit REF] [--dry-run]
 Privacy: the diff is filtered so .env, databases, market data, logs, Telegram sessions and the personal ledger's
 private files are never sent. Free-tier prompts may be used by Google to improve its products.
@@ -18,7 +20,6 @@ import requests
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 MAX_DIFF_CHARS = 200_000
 MAX_CONTEXT_CHARS = 40_000
@@ -60,8 +61,8 @@ def build_prompt(ref: str) -> str:
     return PROMPT.format(context=context, ref=ref, diff=commit_diff(ref))
 
 
-def review(prompt: str, key: str) -> str:
-    r = requests.post(URL.format(model=MODEL), headers={"x-goog-api-key": key},
+def review(prompt: str, key: str, model: str) -> str:
+    r = requests.post(URL.format(model=model), headers={"x-goog-api-key": key},
                       json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=300)
     r.raise_for_status()
     parts = r.json()["candidates"][0]["content"]["parts"]
@@ -73,16 +74,20 @@ def main() -> int:
     ap.add_argument("--commit", default="HEAD")
     ap.add_argument("--dry-run", action="store_true", help="show what would be sent; no API call, no key needed")
     args = ap.parse_args()
+    load_dotenv(ROOT / ".env")
+    model = os.getenv("GEMINI_MODEL", "").strip()
+    if not model:
+        print("GEMINI_MODEL is not set: add e.g. GEMINI_MODEL=gemini-3.1-flash-lite to .env.", file=sys.stderr)
+        return 2
     prompt = build_prompt(args.commit)
     if args.dry_run:
-        print(f"model={MODEL} ref={args.commit} prompt_chars={len(prompt)}\nexcluded: {', '.join(EXCLUDE)}")
+        print(f"model={model} ref={args.commit} prompt_chars={len(prompt)}\nexcluded: {', '.join(EXCLUDE)}")
         return 0
-    load_dotenv(ROOT / ".env")
     key = os.getenv("GEMINI_API_KEY", "").strip()
     if not key:
         print("GEMINI_API_KEY is not set: add it to .env (create it at https://aistudio.google.com).", file=sys.stderr)
         return 2
-    print(review(prompt, key))
+    print(review(prompt, key, model))
     return 0
 
 
