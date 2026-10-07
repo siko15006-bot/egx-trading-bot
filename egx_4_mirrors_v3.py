@@ -1,5 +1,6 @@
 from __future__ import annotations
 from egx_lists import filter_universe, annotate, SECTOR_MAP as UNIVERSE_SECTORS
+from fees_config import FeesConfig, THNDR_FEES, order_fees, round_trip_fees
 
 import argparse
 from dataclasses import dataclass
@@ -90,11 +91,15 @@ class RiskConfig:
     risk_pct: float = 0.01
     atr_sl_mult: float = 1.5
     reward_risk: float = 2.0
-    round_trip_fee_pct: float = 0.003
+    # Explicit legacy per-side override, for controlled comparisons only.
+    round_trip_fee_pct: float | None = None
+    fees: FeesConfig = THNDR_FEES
     capital_gains_tax_pct: float = 0.10
     dividend_tax_pct: float = 0.10  # withheld at source on cash dividends, separate from capital gains tax
     max_position_pct: float = 0.20
     max_avg_volume_pct: float = 0.01
+    # Assumption, not measured (no fill data yet): fixed cost per side on top of fees. Buys fill higher, sells lower.
+    slippage_bps: float = 10.0
 
 
 @dataclass(frozen=True)
@@ -297,8 +302,8 @@ def _net_reward_risk(
 ) -> tuple[float, float, float]:
     gross_loss = (entry - stop_loss) * shares
     gross_profit = (take_profit - entry) * shares
-    loss_fees = risk_cfg.round_trip_fee_pct * shares * (entry + stop_loss)
-    profit_fees = risk_cfg.round_trip_fee_pct * shares * (entry + take_profit)
+    loss_fees = trade_fees(entry, stop_loss, shares, risk_cfg)
+    profit_fees = trade_fees(entry, take_profit, shares, risk_cfg)
     net_loss = gross_loss + loss_fees
     pre_tax_profit = gross_profit - profit_fees
     tax = max(pre_tax_profit, 0) * risk_cfg.capital_gains_tax_pct
@@ -336,12 +341,24 @@ def build_trade_plan(
 
     risk_egp, reward_egp, rr_net = _net_reward_risk(entry, stop_loss, take_profit, shares, risk_cfg)
     if rr_net < risk_cfg.reward_risk:
-        fee = risk_cfg.round_trip_fee_pct
         after_tax = 1 - risk_cfg.capital_gains_tax_pct
-        required_net_per_share = risk_cfg.reward_risk * risk_egp / shares
-        take_profit = (
-            required_net_per_share / after_tax + entry * (1 + fee)
-        ) / (1 - fee)
+        if after_tax <= 0:
+            raise ValueError('Capital gains tax must be below 100%')
+        required_gross = risk_cfg.reward_risk * risk_egp / after_tax
+        low, high = take_profit, max(take_profit, entry * 2)
+        for _ in range(128):
+            if (high - entry) * shares - trade_fees(entry, high, shares, risk_cfg) >= required_gross:
+                break
+            high *= 2
+        else:
+            raise ValueError('Fee configuration cannot produce the requested net reward')
+        for _ in range(64):
+            middle = (low + high) / 2
+            if (middle - entry) * shares - trade_fees(entry, middle, shares, risk_cfg) < required_gross:
+                low = middle
+            else:
+                high = middle
+        take_profit = high
         risk_egp, reward_egp, rr_net = _net_reward_risk(
             entry, stop_loss, take_profit, shares, risk_cfg
         )
@@ -357,7 +374,7 @@ def build_trade_plan(
         reward_egp=reward_egp,
         rr_net=rr_net,
         position_value=shares * entry,
-        notes=f"fees={risk_cfg.round_trip_fee_pct:.2%}, tax={risk_cfg.capital_gains_tax_pct:.0%}",
+        notes=f"fees={'Thndr current-tariff scenario' if risk_cfg.round_trip_fee_pct is None else 'legacy per-side override'}, tax assumption={risk_cfg.capital_gains_tax_pct:.0%}",
     )
 
 
@@ -424,14 +441,101 @@ def with_dividends(ticker: str, df: pd.DataFrame, actions_csv: Path = ACTIONS_CS
 
 
 # توزيعات/سهم بتاريخ استحقاق في الشموع (i, j]: ماسك السهم في إغلاق i ولسه ماسكه قبل افتتاح يوم الاستحقاق.
+# ---- Execution conventions shared by backtest, backtest_optimizer and auto_sim (red-team review 2026-10-07) ----
+# Yahoo's EGX Open equals the previous Close on ~98% of bars and lies outside [Low, High] on ~18%
+# (KNOWN_ISSUES.md), so no path fills at the Open: every fill is a price the bar actually traded.
+# EGX daily price limits keep normal moves within ±20%; a bigger close-to-close jump is an unadjusted or misdated
+# corporate action (e.g. HDBK −49.6% on 2026-06-29), so no trade is carried across it.
+MAX_DAILY_MOVE = 0.25
+
+
+def data_breaks(data: pd.DataFrame) -> np.ndarray:
+    """True on traded bars whose move since the previous traded bar exceeds MAX_DAILY_MOVE per elapsed session.
+    Filler rows (Volume 0, Yahoo gaps) count as elapsed sessions, so a real 3-session move after a gap is not a break."""
+    close = data["Close"].to_numpy(dtype=float)
+    real = data["Volume"].to_numpy(dtype=float) > 0
+    pos = np.arange(len(close))
+    prev = pd.Series(np.where(real, pos, np.nan)).ffill().shift(1).to_numpy()
+    out = np.zeros(len(close), dtype=bool)
+    ok = real & ~np.isnan(prev)
+    p = prev[ok].astype(int)
+    out[ok] = np.abs(np.log(close[ok] / close[p])) > (pos[ok] - p) * np.log1p(MAX_DAILY_MOVE)
+    return out
+
+
+def stop_fill(bar: pd.Series, stop: float) -> float:
+    return min(stop, float(bar["High"]))  # a bar entirely below the stop fills at its best traded price
+
+
+def target_fill(bar: pd.Series, target: float) -> float:
+    return max(target, float(bar["Low"]))
+
+
+def simulate_trade(data: pd.DataFrame, i: int, stop0: float, target: float, atr: float,
+                   breaks: Optional[np.ndarray] = None) -> dict[str, Any]:
+    """One long trade from a signal on bar i. The signal is only known after bar i closes, so the entry is the close of
+    bar i+1; exits are checked from bar i+2. status: pending (no bar i+1 yet), skipped (entry invalid), open, closed."""
+    breaks = data_breaks(data) if breaks is None else breaks
+    e = i + 1
+    if e >= len(data):
+        return {"status": "pending"}
+    entry = float(data["Close"].iloc[e])
+    if breaks[e] or not stop0 < entry < target:
+        return {"status": "skipped", "entry_index": e}
+    stop = stop0
+    for j in range(e + 1, len(data)):
+        if breaks[j]:
+            return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j - 1,
+                    "exit": float(data["Close"].iloc[j - 1]), "reason": "DATA_BREAK", "stop": stop}
+        bar = data.iloc[j]
+        if bar["Low"] <= stop:
+            return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j, "exit": stop_fill(bar, stop),
+                    "reason": "TRAIL_SL" if stop > stop0 else "SL", "stop": stop}
+        if bar["High"] >= target:
+            return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j,
+                    "exit": target_fill(bar, target), "reason": "TP", "stop": stop}
+        if bar["Close"] >= entry + 2 * atr:
+            stop = max(stop, entry + atr)
+        elif bar["Close"] >= entry + atr:
+            stop = max(stop, entry)
+    return {"status": "open", "entry_index": e, "entry": entry, "exit_index": len(data) - 1,
+            "exit": float(data["Close"].iloc[-1]), "reason": "END", "stop": stop}
+
+
 def dividends_between(data: pd.DataFrame, i: int, j: int) -> float:
     return float(data["Dividends"].iloc[i + 1 : j + 1].sum()) if "Dividends" in data.columns else 0.0
 
 
 # صافي ربح صفقة: فرق السعر − العمولة − ضريبة الأرباح الرأسمالية + صافي التوزيعات بعد الاستقطاع.
 # مشتركة بين المحرك و backtest_optimizer عشان الاتنين يفضلوا متطابقين.
-def net_trade_pnl(entry: float, exit_price: float, shares: int, risk: RiskConfig, dividends_per_share: float = 0.0) -> float:
-    pre_tax = (exit_price - entry) * shares - risk.round_trip_fee_pct * shares * (entry + exit_price)
+def trade_fees(entry, exit_price, shares, risk, *, same_session=False, entry_fills=None, exit_fills=None):
+    if risk.round_trip_fee_pct is not None:
+        return risk.round_trip_fee_pct * shares * (entry + exit_price)
+    return round_trip_fees(entry * shares, exit_price * shares, same_session=same_session,
+                           entry_fills=entry_fills, exit_fills=exit_fills, config=risk.fees)
+
+
+def entry_order_fee(value, risk):
+    if risk.round_trip_fee_pct is not None:
+        return value * risk.round_trip_fee_pct
+    return sum(order_fees(value, config=risk.fees).values())
+
+
+def same_session(entry_date, exit_date):
+    def cairo_day(value):
+        stamp = pd.Timestamp(value)
+        if pd.isna(stamp):
+            raise ValueError('Missing execution timestamp')
+        return (stamp.tz_localize('Africa/Cairo') if stamp.tzinfo is None else stamp.tz_convert('Africa/Cairo')).date()
+    return cairo_day(entry_date) == cairo_day(exit_date)
+
+
+def net_trade_pnl(entry: float, exit_price: float, shares: int, risk: RiskConfig, dividends_per_share: float = 0.0,
+                  *, same_session=False, entry_fills=None, exit_fills=None) -> float:
+    slip = risk.slippage_bps / 10_000
+    entry, exit_price = entry * (1 + slip), exit_price * (1 - slip)
+    pre_tax = (exit_price - entry) * shares - trade_fees(entry, exit_price, shares, risk, same_session=same_session,
+                                                       entry_fills=entry_fills, exit_fills=exit_fills)
     return pre_tax - max(pre_tax, 0) * risk.capital_gains_tax_pct + dividends_per_share * (1 - risk.dividend_tax_pct) * shares
 
 
@@ -477,8 +581,9 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
         }
 
     equity_events.append((data.index[start_index], equity))
+    breaks = data_breaks(data)
 
-    while i < len(data):
+    while i < len(data) - 1:
         window = data.iloc[: i + 1]
         screen_ok, _ = passes_screener(window, cfg.screen)
         evaluation = evaluate_4_mirrors(window, cfg.signal)
@@ -487,34 +592,16 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
             i += 1
             continue
 
-        entry = plan.entry
-        atr = plan.atr
-        stop_loss = plan.stop_loss
-        take_profit = plan.take_profit
-        exit_price = data.iloc[-1]["Close"]
-        exit_index = len(data) - 1
-        exit_reason = "END"
-
-        for j in range(i, len(data)):
-            row = data.iloc[j]
-            if row["Low"] <= stop_loss:
-                exit_price = stop_loss
-                exit_index = j
-                exit_reason = "TRAIL_SL" if stop_loss > plan.stop_loss else "SL"
-                break
-            if row["High"] >= take_profit:
-                exit_price = take_profit
-                exit_index = j
-                exit_reason = "TP"
-                break
-            if row["Close"] >= entry + 2 * atr:
-                stop_loss = max(stop_loss, entry + atr)
-            elif row["Close"] >= entry + atr:
-                stop_loss = max(stop_loss, entry)
+        t = simulate_trade(data, i, plan.stop_loss, plan.take_profit, plan.atr, breaks)
+        if t["status"] in ("pending", "skipped"):
+            i += 1
+            continue
+        entry, exit_price, exit_index, exit_reason = t["entry"], t["exit"], t["exit_index"], t["reason"]
 
         risk_per_share = entry - plan.stop_loss
-        div_ps = dividends_between(data, i, exit_index)
-        pnl = net_trade_pnl(entry, float(exit_price), plan.shares, cfg.risk, div_ps)
+        div_ps = dividends_between(data, t["entry_index"], exit_index)
+        pnl = net_trade_pnl(entry, float(exit_price), plan.shares, cfg.risk, div_ps,
+                            same_session=same_session(data.index[t["entry_index"]], data.index[exit_index]))
         r_multiple = pnl / plan.risk_egp if plan.risk_egp > 0 else _trade_return(entry, float(exit_price), risk_per_share)
         equity += pnl
         r_values.append(r_multiple)
@@ -522,7 +609,8 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
         trades.append(
             {
                 "Ticker": "BACKTEST",
-                "Entry_Date": data.index[i],
+                "Signal_Date": data.index[i],
+                "Entry_Date": data.index[t["entry_index"]],
                 "Exit_Date": data.index[exit_index],
                 "Entry": entry,
                 "Exit": float(exit_price),
@@ -595,6 +683,9 @@ def scan_universe(
 
     for ticker, raw_df in filter_universe(data_map, demo_mode=demo_mode).items():
         data = calculate_indicators(raw_df)
+        if data_breaks(data)[-60:].any():  # indicators span an unadjusted corporate action → not comparable
+            rows.append({"Ticker": ticker, "Status": "DATA_BREAK", "Checks": "close-to-close move >25% in last 60 bars"})
+            continue
         screen_ok, screen_checks = passes_screener(data, screen_cfg)
         if not screen_ok:
             rows.append({"Ticker": ticker, "Status": "SCREEN_FAIL", "Checks": _checks_text(screen_checks)})
@@ -706,6 +797,8 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--risk", type=float, default=0.01)
     parser.add_argument("--out", default="")
     parser.add_argument("--backtest", action="store_true")
+    parser.add_argument("--slippage-bps", type=float, default=RiskConfig.slippage_bps,
+                        help="cost per side in basis points on top of fees (assumption; default %(default)s)")
     parser.add_argument("--dividend-mode", choices=["add", "none"], help="required for data folders not in KNOWN_*_FOLDERS")
     parser.add_argument("--sector-limit", type=int, default=2)
     parser.add_argument("--min-adx", type=float, default=20.0)
@@ -716,7 +809,7 @@ def main() -> None:
     args = _parse_args()
     screen_cfg = ScreenConfig()
     signal_cfg = SignalConfig(min_adx=args.min_adx)
-    risk_cfg = RiskConfig(capital=args.capital, risk_pct=args.risk)
+    risk_cfg = RiskConfig(capital=args.capital, risk_pct=args.risk, slippage_bps=args.slippage_bps)
     system_cfg = SystemConfig(screen=screen_cfg, signal=signal_cfg, risk=risk_cfg)
 
     data_map = load_data_map(Path(args.path_or_folder)) if args.path_or_folder else {"DEMO.CA": _demo_data()}

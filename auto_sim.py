@@ -5,9 +5,11 @@ is ruled ABANDON in decision_report.md. Separate table `auto_sim_trades`.
 
 Rules (fixed, same as egx_4_mirrors_v3.backtest except where noted):
 - Each daily run opens the top 2 BUY rows of scan_universe, ranked by RR_Net desc, then ticker A→Z.
-  Skipped if that ticker already has an OPEN auto-sim trade. Entry = signal-day close (= plan.entry).
-- Exits are replayed from the bars after the signal day (not the signal bar itself — the engine checks it,
-  which is a known look-ahead), SL checked before TP on each bar; a gap through the stop/target fills at the Open.
+  Skipped if that ticker already has an OPEN auto-sim trade. Stored entry starts as the signal close and is replaced
+  by the real fill (next session close) once that bar exists.
+- Same execution rules as the engine (egx_4_mirrors_v3.simulate_trade): entry at the close of the session after the
+  signal, exits from the bar after that, SL before TP, fills always inside the bar's [Low, High] (no Open: Yahoo's EGX
+  Open is not a real opening price), and no trade carried across a >25% data break.
 - Trailing stop exactly as the engine: Close ≥ entry+2·ATR → stop ≥ entry+ATR; Close ≥ entry+ATR → stop ≥ entry.
 - PnL via egx_4_mirrors_v3.net_trade_pnl, including net dividends (data/ is dividend-unadjusted).
 """
@@ -40,52 +42,43 @@ def _connect(db_path=None) -> sqlite3.Connection:
     return con
 
 
-def replay(data: pd.DataFrame, signal_date: str, entry: float, stop0: float, tp: float, atr: float
-           ) -> tuple[float, Optional[tuple[str, float, str, int]]]:
-    """Returns (current stop, exit) where exit = (date, price, reason, bar index) or None while still open."""
+def replay(data: pd.DataFrame, signal_date: str, stop0: float, tp: float, atr: float) -> dict:
+    """egx_4_mirrors_v3.simulate_trade for the bar dated signal_date (entry at the next close, in-range fills only)."""
     days = [_day(ts) for ts in data.index]
     if signal_date not in days:
-        return stop0, None
-    i = days.index(signal_date)
-    stop = stop0
-    for j in range(i + 1, len(data)):
-        row = data.iloc[j]
-        reason = "TRAIL_SL" if stop > stop0 else "SL"
-        if row["Open"] <= stop:
-            return stop, (days[j], float(row["Open"]), reason, j)
-        if row["Low"] <= stop:
-            return stop, (days[j], stop, reason, j)
-        if row["Open"] >= tp:
-            return stop, (days[j], float(row["Open"]), "TP", j)
-        if row["High"] >= tp:
-            return stop, (days[j], tp, "TP", j)
-        if row["Close"] >= entry + 2 * atr:
-            stop = max(stop, entry + atr)
-        elif row["Close"] >= entry + atr:
-            stop = max(stop, entry)
-    return stop, None
+        return {"status": "pending"}
+    t = eng.simulate_trade(data, days.index(signal_date), stop0, tp, atr)
+    if "exit_index" in t:
+        t["exit_date"] = days[t["exit_index"]]
+    return t
 
 
 def update_open(data_map: Mapping[str, pd.DataFrame], risk: eng.RiskConfig, db_path=None) -> int:
     closed = 0
     with closing(_connect(db_path)) as con:
-        rows = con.execute("SELECT id, ticker, signal_date, entry, stop0, tp, atr, shares FROM auto_sim_trades "
+        rows = con.execute("SELECT id, ticker, signal_date, stop0, tp, atr, shares FROM auto_sim_trades "
                            "WHERE status = 'OPEN'").fetchall()
-        for tid, ticker, sdate, entry, stop0, tp, atr, shares in rows:
+        for tid, ticker, sdate, stop0, tp, atr, shares in rows:
             if ticker not in data_map:
                 continue
             data = eng.with_dividends(ticker, data_map[ticker])
-            stop, exit_ = replay(data, sdate, entry, stop0, tp, atr)
-            if exit_ is None:
-                con.execute("UPDATE auto_sim_trades SET stop = ? WHERE id = ?", (stop, tid))
+            t = replay(data, sdate, stop0, tp, atr)
+            if t["status"] == "pending":
                 continue
-            date, price, reason, j = exit_
-            i = [_day(ts) for ts in data.index].index(sdate)
-            div_ps = eng.dividends_between(data, i, j)
-            pnl = eng.net_trade_pnl(entry, price, shares, risk, div_ps)
-            con.execute("UPDATE auto_sim_trades SET status='CLOSED', stop=?, exit_date=?, exit_price=?, exit_reason=?, "
-                        "div_ps=?, pnl_egp=?, pnl_pct=? WHERE id=?",
-                        (stop, date, price, reason, div_ps, pnl, pnl / (entry * shares) * 100, tid))
+            if t["status"] == "skipped":  # next close already beyond the stop/target, or a data break
+                con.execute("UPDATE auto_sim_trades SET status='SKIPPED', exit_reason='ENTRY_INVALID' WHERE id=?", (tid,))
+                continue
+            entry = t["entry"]
+            if t["status"] == "open":
+                con.execute("UPDATE auto_sim_trades SET entry = ?, stop = ? WHERE id = ?", (entry, t["stop"], tid))
+                continue
+            div_ps = eng.dividends_between(data, t["entry_index"], t["exit_index"])
+            pnl = eng.net_trade_pnl(entry, t["exit"], shares, risk, div_ps,
+                                    same_session=eng.same_session(data.index[t["entry_index"]], data.index[t["exit_index"]]))
+            con.execute("UPDATE auto_sim_trades SET status='CLOSED', entry=?, stop=?, exit_date=?, exit_price=?, "
+                        "exit_reason=?, div_ps=?, pnl_egp=?, pnl_pct=? WHERE id=?",
+                        (entry, t["stop"], t["exit_date"], t["exit"], t["reason"], div_ps, pnl,
+                         pnl / (entry * shares) * 100, tid))
             closed += 1
         con.commit()
     return closed

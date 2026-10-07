@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+import egx_4_mirrors_v3 as eng
 import research_h1_momentum as h1
 import research_h3_ai_score as h3
 from paper_trading import _db_path
@@ -59,10 +60,13 @@ def score_pool(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFrame) 
     return d[["ticker", "rank", "score", "top10"]]
 
 
-def evaluate(book: pd.DataFrame, opens: pd.DataFrame, closes: pd.DataFrame) -> pd.DataFrame:
-    """Per completed period: top-10 and EW pool returns, ideal (close→close) and realistic (next open→next open)."""
+def evaluate(book: pd.DataFrame, closes: pd.DataFrame) -> pd.DataFrame:
+    """Per completed period: top-10 and EW pool returns, ideal (close of the rebalance day → close of the next) and
+    realistic (close of the session after → close of the session after the next rebalance). No Open: Yahoo's EGX Open
+    is not a real opening price. Stocks with a >25% data break inside the period are left out of both averages."""
     dates = sorted(book["rebalance"].unique())
     idx = closes.index.strftime("%Y-%m-%d").tolist()
+    jumps = closes.pct_change(fill_method=None).abs() > eng.MAX_DAILY_MOVE
     rows = []
     for a, b in zip(dates, dates[1:]):
         if a not in idx or b not in idx:  # a Yahoo revision dropped the session: skip rather than guess
@@ -70,12 +74,12 @@ def evaluate(book: pd.DataFrame, opens: pd.DataFrame, closes: pd.DataFrame) -> p
         g = book[book["rebalance"] == a]
         ia, ib = idx.index(a), idx.index(b)
         row = {"period": f"{a}→{b}"}
-        for kind, px, i0, i1 in (("ideal", closes, ia, ib), ("real", opens, ia + 1, ib + 1)):
-            if i1 >= len(px):
+        for kind, i0, i1 in (("ideal", ia, ib), ("real", ia + 1, ib + 1)):
+            if i1 >= len(closes):
                 continue  # realistic period completes one session after the next rebalance
-            ret = px.iloc[i1] / px.iloc[i0] - 1
-            row[f"{kind}_top10"] = float(ret[g.loc[g["top10"] == 1, "ticker"]].mean()) - FEE
-            row[f"{kind}_ew"] = float(ret[g["ticker"]].mean())
+            ret = (closes.iloc[i1] / closes.iloc[i0] - 1)[~jumps.iloc[i0 + 1:i1 + 1].any()]
+            row[f"{kind}_top10"] = float(ret.reindex(g.loc[g["top10"] == 1, "ticker"]).mean()) - FEE
+            row[f"{kind}_ew"] = float(ret.reindex(g["ticker"]).mean())
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -108,10 +112,7 @@ def main(force: bool = False) -> int:
                         [(rebalance, r.ticker, int(r.rank), float(r.score), int(r.top10)) for r in picks.itertuples()])
         con.commit()
         book = pd.read_sql_query("SELECT * FROM h3_forward", con)
-    opens = pd.DataFrame({f.stem: pd.read_csv(f, index_col="Date")["Open"] for f in LIVE.glob("*.csv")})
-    opens.index = pd.to_datetime(opens.index)
-    opens = opens.reindex(close.index).ffill()
-    stats, kill = summary(evaluate(book, opens, close.ffill()))
+    stats, kill = summary(evaluate(book, close.ffill()))
     top = picks[picks["top10"] == 1]
     lines = "\n".join(f"{int(r.rank)}. {r.ticker.replace('.CA', '')} ({r.score:.2f})" for r in top.itertuples())
     send_telegram(f"{LABEL}\nإعادة ترتيب: {rebalance} — أعلى 10 من {len(picks)} سهم سيولة:\n{lines}\n\n{stats}")
@@ -122,14 +123,13 @@ def main(force: bool = False) -> int:
 def _selftest() -> None:
     cal = [f"2026-01-{d:02d}" for d in range(1, 31)]
     assert due("2026-01-05", None, cal) and not due("2026-01-21", "2026-01-01", cal) and due("2026-01-22", "2026-01-01", cal)
-    idx = pd.date_range("2026-01-01", periods=4)
-    closes = pd.DataFrame({"A": [10, 11, 12, 12], "B": [10, 10, 9, 9]}, index=idx, dtype=float)
-    opens = pd.DataFrame({"A": [10, 10, 12, 13], "B": [10, 10, 10, 8]}, index=idx, dtype=float)
-    book = pd.DataFrame({"rebalance": ["2026-01-01"] * 2 + ["2026-01-03"] * 2, "ticker": ["A", "B"] * 2,
-                         "top10": [1, 0, 1, 0]})
-    ev = evaluate(book, opens, closes).iloc[0]
+    idx = pd.date_range("2026-01-01", periods=5)
+    closes = pd.DataFrame({"A": [10, 11, 12, 12, 13], "B": [10, 10, 9, 9, 8], "C": [10, 10, 30, 30, 30]}, index=idx, dtype=float)
+    book = pd.DataFrame({"rebalance": ["2026-01-01"] * 3 + ["2026-01-03"] * 3, "ticker": ["A", "B", "C"] * 2,
+                         "top10": [1, 0, 1, 1, 0, 1]})
+    ev = evaluate(book, closes).iloc[0]   # C jumps +200% (data break) → excluded from both averages
     assert abs(ev["ideal_top10"] - (0.2 - FEE)) < 1e-12 and abs(ev["ideal_ew"] - 0.05) < 1e-12
-    assert abs(ev["real_top10"] - (0.3 - FEE)) < 1e-12 and abs(ev["real_ew"] - (0.3 - 0.2) / 2) < 1e-12
+    assert abs(ev["real_top10"] - (12 / 11 - 1 - FEE)) < 1e-12 and abs(ev["real_ew"] - ((12 / 11 - 1) + (9 / 10 - 1)) / 2) < 1e-12
     text, kill = summary(pd.DataFrame([{"real_top10": -0.2, "real_ew": 0.0}]))
     assert kill and "⛔" in text
     print("h3_forward self-test OK")

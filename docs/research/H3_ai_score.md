@@ -99,8 +99,8 @@ Under that standard the Sharpe gap is 0.21 < 0.30, so: **Level 1 = PENDING, Leve
 - **Universe / top 10:** same 403 candidates, freshly downloaded fully adjusted (`data_h3_live/`), H1 eligibility
   (≥147 real bars, ≥15 real of last 21, real bar on the day, top 60 by 63-day median traded value), no price filter.
   Top 10 = highest score; ties broken by ticker A→Z. Benchmark = equal weight of the same 60.
-- **Two executions recorded:** ideal (close of the rebalance day → close of the next) and realistic (open of the
-  next session → open of the session after the next rebalance). Both net of 0.3% per period for the top 10
+- **Two executions recorded:** ideal (close of the rebalance day → close of the next) and realistic (close of the
+  next session → close of the session after the next rebalance; see edit log). Both net of 0.3% per period for the top 10
   (full turnover assumed) and 0 for the benchmark. Realistic periods complete one session later.
 - **Kill switch (realistic):** stop if cumulative top-10 return minus cumulative EW return ≤ −10 percentage points at
   any completed period.
@@ -117,3 +117,6 @@ Under that standard the Sharpe gap is 0.21 < 0.30, so: **Level 1 = PENDING, Leve
 
 - 2026-10-07: created (replaces the H2 filter idea; two-level decision agreed in review).
 - 2026-10-07 (after the run): classification on realistic execution and forward-test protocol added; no change to the run.
+- 2026-10-07 (before any completed period): realistic leg changed from next Open to next close (Yahoo's EGX Open is not a real
+  opening price, KNOWN_ISSUES.md), and stocks with a >25% data break inside a period are left out of both averages.
+  Model, features, universe and schedule unchanged, so the 12-period count is not restarted.

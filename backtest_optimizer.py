@@ -100,7 +100,7 @@ def _trend_entry(data: pd.DataFrame, i: int, sc: Scenario) -> Optional[dict[str,
     shares = _shares(entry, stop, row, sc.risk)
     if shares <= 0:
         return None
-    risk_egp = (entry - stop) * shares + sc.risk.round_trip_fee_pct * shares * (entry + stop)
+    risk_egp = (entry - stop) * shares + eng.trade_fees(entry, stop, shares, sc.risk)
     return {"entry": entry, "stop": stop, "tp": float("inf"), "atr": float(row["ATR"]), "shares": shares,
             "risk_egp": risk_egp, "position_value": shares * entry}
 
@@ -118,31 +118,34 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
     start = _start(data, start_date)
     i = start
     n = len(data)
-    while i < n:
+    breaks = eng.data_breaks(data)
+    while i < n - 1:
         plan = entry_fn(data, i, sc)
         if plan is None:
             i += 1
             continue
-        entry, initial_stop, tp, atr = plan["entry"], plan["stop"], plan["tp"], plan["atr"]
+        initial_stop, tp, atr = plan["stop"], plan["tp"], plan["atr"]
+        # Same execution conventions as eng.simulate_trade: entry at the close after the signal, in-range fills,
+        # no Open (not a real opening price in this data), no trade across a data break. `mode` no longer differs.
+        e = i + 1
+        entry = float(data["Close"].iloc[e])
+        if breaks[e] or not initial_stop < entry < tp:
+            i += 1
+            continue
         stop = initial_stop
         exit_price, exit_index, reason = float(data["Close"].iloc[-1]), n - 1, "END"
-        first = i if mode == "engine" else i + 1   # engine = منطق المحرك القديم (للتحقق فقط)
         highest_close = entry
-        for j in range(first, n):
+        for j in range(e + 1, n):
             row = data.iloc[j]
-            if mode == "realistic" and row["Open"] <= stop:          # فجوة تحت الوقف → تنفيذ عند الافتتاح
-                exit_price, exit_index = float(row["Open"]), j
-                reason = "TRAIL_SL" if stop > initial_stop else "SL"
+            if breaks[j]:
+                exit_price, exit_index, reason = float(data["Close"].iloc[j - 1]), j - 1, "DATA_BREAK"
                 break
             if row["Low"] <= stop:
-                exit_price, exit_index = stop, j
+                exit_price, exit_index = eng.stop_fill(row, stop), j
                 reason = "TRAIL_SL" if stop > initial_stop else "SL"
                 break
-            if mode == "realistic" and row["Open"] >= tp:             # فجوة فوق الهدف → تنفيذ عند الافتتاح
-                exit_price, exit_index, reason = float(row["Open"]), j, "TP"
-                break
             if row["High"] >= tp:
-                exit_price, exit_index, reason = tp, j, "TP"
+                exit_price, exit_index, reason = eng.target_fill(row, tp), j, "TP"
                 break
             if sc.kind == "trend":
                 if row["Close"] < row["EMA_20"]:                         # كسر EMA20 بالإغلاق
@@ -155,12 +158,14 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
                     stop = max(stop, entry + atr)
                 elif row["Close"] >= entry + sc.be_trigger_atr * atr:
                     stop = max(stop, entry)
-            if sc.time_stop_days is not None and (j - i) >= sc.time_stop_days:
+            if sc.time_stop_days is not None and (j - e) >= sc.time_stop_days:
                 exit_price, exit_index, reason = float(row["Close"]), j, "TIME_STOP"
                 break
-        if mode == "realistic" and reason != "END":
-            assert exit_index > i, "look-ahead: exit on the entry bar"
-        pnl = eng.net_trade_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk, eng.dividends_between(data, i, exit_index))
+        if reason != "END":
+            assert exit_index > e or reason == "DATA_BREAK", "look-ahead: exit on the entry bar"
+        i = e  # entry bar index from here on (P&L, exposure, dividends, trade record)
+        pnl = eng.net_trade_pnl(entry, float(exit_price), int(plan["shares"]), sc.risk, eng.dividends_between(data, i, exit_index),
+                                same_session=eng.same_session(data.index[i], data.index[exit_index]))
         equity += pnl
         daily_pnl.iloc[exit_index] += pnl
         exposure.iloc[i: exit_index + 1] += plan["position_value"] / capital
@@ -179,16 +184,17 @@ def simulate(df: pd.DataFrame, sc: Scenario, mode: str = "realistic", start_date
 # ------------------------------------------------------------------ سيناريو D: محفظة مشتركة
 def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, start_date: Optional[str] = None,
                pos_pct: float = 0.15, sl_pct: float = 0.15) -> dict[str, Any]:
-    """Signal-Based Buy & Hold: دخول عند إغلاق يوم إشارة C، خروج بإغلاق < EMA50 أو وقف −15% (فجوة → الافتتاح).
-    لا Trailing ولا هدف. الخروج يتفحص قبل الدخول في نفس اليوم، فأول خروج ممكن = اليوم التالي للدخول."""
+    """Signal-Based Buy & Hold: دخول عند إغلاق الجلسة اللي بعد إشارة C، خروج بإغلاق < EMA50 أو وقف −15%
+    (تنفيذ جوه مدى الشمعة، من غير Open). لا Trailing ولا هدف. أي سهم فيه data break بيتقفل على آخر إغلاق سليم."""
     sc = SCENARIOS["C_trend"]
-    risk, fee = sc.risk, sc.risk.round_trip_fee_pct
+    risk = sc.risk
     ind = {t: eng.calculate_indicators(df) for t, df in data_map.items()}
+    brk = {t: pd.Series(eng.data_breaks(d), index=d.index) for t, d in ind.items()}
     signals: dict[pd.Timestamp, list[tuple[float, str]]] = {}
     for t, d in ind.items():
-        for i in range(_start(d, start_date), len(d)):
-            if _trend_entry(d, i, sc) is not None:   # الأقوى حجماً نسبياً أولاً لو الإشارات أكتر من الأماكن الفاضية
-                signals.setdefault(d.index[i], []).append((float(d["Volume"].iloc[i] / d["Volume_SMA20"].iloc[i]), t))
+        for i in range(_start(d, start_date), len(d) - 1):
+            if _trend_entry(d, i, sc) is not None:   # executable at the ticker's next session close
+                signals.setdefault(d.index[i + 1], []).append((float(d["Volume"].iloc[i] / d["Volume_SMA20"].iloc[i]), t))
     dates = sorted(set().union(*(d.index[_start(d, start_date):] for d in ind.values())))
     cash, pos, last_close = capital, {}, {}
     trades: list[dict[str, Any]] = []
@@ -199,8 +205,9 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
         p = pos.pop(t)
         d = ind[t]
         pnl = eng.net_trade_pnl(p["entry"], px, p["shares"], risk,
-                                eng.dividends_between(d, d.index.get_loc(p["ts"]), d.index.get_loc(ts)))
-        cash += p["shares"] * p["entry"] * (1 + fee / 2) + pnl   # يرجّع التكلفة المدفوعة + صافي الربح
+                                eng.dividends_between(d, d.index.get_loc(p["ts"]), d.index.get_loc(ts)),
+                                same_session=eng.same_session(p['ts'], ts))
+        cash += p['cost'] + pnl
         value = p["shares"] * p["entry"]
         trades.append({"ticker": t, "entry_date": p["ts"], "exit_date": ts, "entry": p["entry"], "exit": px, "shares": p["shares"],
                        "position_value": value, "pnl": pnl, "R": pnl / (value * sl_pct), "pnl_pct_pos": pnl / value * 100,
@@ -212,10 +219,11 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
             if ts not in d.index:
                 continue
             row, stop = d.loc[ts], pos[t]["stop"]
-            if row["Open"] <= stop:
-                close_position(t, ts, float(row["Open"]), "SL")
+            if brk[t].loc[ts]:
+                prev = d.index[d.index.get_loc(ts) - 1]
+                close_position(t, prev, float(d.at[prev, "Close"]), "DATA_BREAK")
             elif row["Low"] <= stop:
-                close_position(t, ts, stop, "SL")
+                close_position(t, ts, eng.stop_fill(row, stop), "SL")
             elif row["Close"] < row["EMA_50"]:
                 close_position(t, ts, float(row["Close"]), "EMA50_EXIT")
         for t, d in ind.items():
@@ -229,12 +237,19 @@ def simulate_d(data_map: dict[str, pd.DataFrame], max_pos: int, capital: float, 
                 continue
             row = ind[t].loc[ts]
             px = float(row["Close"])
-            budget = min(pos_pct * equity, cash / (1 + fee / 2))
+            if brk[t].loc[ts]:
+                continue
+            budget = min(pos_pct * equity, cash)
             shares = int(min(budget // px, floor(risk.max_avg_volume_pct * float(row["Volume_SMA20"]))))
             if shares <= 0:
                 continue
-            cash -= shares * px * (1 + fee / 2)
-            pos[t] = {"entry": px, "stop": px * (1 - sl_pct), "shares": shares, "ts": ts}
+            while shares > 0 and shares * px + eng.entry_order_fee(shares * px, risk) > cash:
+                shares -= 1
+            if shares <= 0:
+                continue
+            cost = shares * px + eng.entry_order_fee(shares * px, risk)
+            cash -= cost
+            pos[t] = {"entry": px, "stop": px * (1 - sl_pct), "shares": shares, "ts": ts, 'cost': cost}
         held = sum(p["shares"] * last_close[t] for t, p in pos.items())
         curve[ts], invested[ts] = cash + held, held / (cash + held)
     for t in list(pos):   # مراكز مفتوحة في النهاية → تقييم على آخر إغلاق (END)
@@ -314,6 +329,10 @@ def run_suite(data_map: dict[str, pd.DataFrame], scenarios: dict[str, Scenario],
 
 
 def main() -> int:
+    global SCENARIOS
+    if "--slippage-bps" in sys.argv:  # cost per side on top of fees, applied to every scenario
+        bps = float(sys.argv[sys.argv.index("--slippage-bps") + 1])
+        SCENARIOS = {k: replace(v, risk=replace(v.risk, slippage_bps=bps)) for k, v in SCENARIOS.items()}
     log_path = HERE / "logs" / f"optimization_v2_{datetime.now():%Y%m%d}.log"
 
     def log(msg: str) -> None:
@@ -373,7 +392,9 @@ def main() -> int:
 
     # 4) القرار
     # الاختيار بأقل Sharpe في الفترتين (ثبات)، مش Sharpe الفترة الأولى بس — B_risk كان الأعلى على data/ وانهار في 2022–23
-    best = max(main_runs, key=lambda k: min(main_runs[k]["metrics"]["sharpe"], full_runs[k]["metrics"]["sharpe"]))
+    # Select on the main (data/) window only; the 2022-23 runs stay a true out-of-sample check. Main-window metrics are
+    # in-sample (the trail multiplier above is also chosen on data/).
+    best = max(main_runs, key=lambda k: main_runs[k]["metrics"]["sharpe"])
     rec = _recommend(best, main_runs, main_bh, full_runs, full_bh)
     report = build_report(trail, best_trail, main_runs, main_bh, full_runs, full_bh, trough_runs, trough_bh, fx_move, best, rec, same_bar)
     (HERE / "optimization_report_v2.md").write_text(report, encoding="utf-8")
