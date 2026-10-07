@@ -26,7 +26,8 @@ or shown on a shared page, raw statement files kept outside the repo. Nothing fr
 | `imports` | id, file_name, sha256, imported_at, period_from, period_to, row_count | Same file twice → rejected by sha256 |
 | `raw_rows` | import_id, row_no, raw_json | Untouched copy of every statement row (audit trail) |
 | `fills` | id, import_id, row_no, ts_cairo, ticker, side (BUY/SELL), qty, price, gross_value, brokerage, egx, mcdr, fra, insurance, stamp, other_fees, total_fees, order_ref | One row per executed transaction; UNIQUE(import_id, row_no) — see "Fill identity" |
-| `cash_events` | id, import_id, ts_cairo, kind, ticker, amount | dividend, stamp T0 refund, commission kickback (Trader), custody fee, subscription, deposit, withdrawal |
+| `position_events` | id, import_id, row_no, ts_cairo, ticker, kind, qty, ratio_num, ratio_den, cost_basis, review_flag | transfer in/out, bonus shares, IPO allocation, split — see "Event types" |
+| `cash_events` | id, import_id, row_no, ts_cairo, kind, ticker, amount, review_flag | dividend, stamp T0 refund, commission kickback (Trader), custody fee, subscription, deposit, withdrawal |
 | `round_trips` | id, ticker, open_ts, close_ts, qty, avg_buy, avg_sell, fees, dividends, tax, net_pnl, net_pct, holding_sessions, same_session | Derived (rebuilt, never edited): FIFO matching of fills per ticker |
 | `trip_sources` | trip_id, source, ref, lag_minutes | Derived: matched signal, if any (see below) |
 
@@ -37,8 +38,21 @@ stock, quantity and price — e.g. two fills of one order), so the second would 
 A fill is now identified by **where it came from: row `row_no` of import `import_id`**, `UNIQUE(import_id, row_no)`.
 - Importing the same file twice is still blocked by `imports.sha256`.
 - New risk this opens: two *different* files covering the same days (e.g. a monthly and a yearly export) would load
-  the same trades twice. `validate_balance` must therefore reject a new import whose period overlaps an earlier one
-  unless the overlap is explicitly resolved; reconciliation with the app's holdings is the backstop.
+  the same trades twice. Decision (Ahmed, 2026-10-07): **warn and flag, never block** — older statements must stay
+  addable. `validate_balance` returns `PERIOD_OVERLAP` with the earlier import ids; they are stored in
+  `imports.overlaps_imports`, every row of the new import gets `review_flag = 'POSSIBLE_DUPLICATE'`, and Ahmed confirms
+  or removes them by hand. Reconciliation with the app's holdings is the backstop.
+
+## Event types (decided 2026-10-07)
+
+| Type | Table | Examples | Effect on cost basis |
+|---|---|---|---|
+| BUY / SELL | `fills` | executed orders, partial fills | BUY lots are the only purchase cost; SELL closes lots FIFO |
+| POSITION | `position_events` | `transfer_in`, `transfer_out`, `bonus_shares`, `subscription_allocation` (IPO), `split` | change share count without a purchase: bonus/split spread the existing cost over more shares; a transfer's cost is `NULL` (unknown, not zero) and its shares stay out of P&L until the cost is known; IPO allocation carries its subscription cost from the matching cash row |
+| CASH | `cash_events` | dividend, stamp refund, Trader kickback, custody fee, subscription, deposit, withdrawal | dividends/refunds enter trip P&L; deposits/withdrawals do not |
+
+Kinds match Codex's acceptance fixtures. A position can never be written as a fill (`side` CHECK), so it can never
+become a BUY lot.
 
 ## Parser
 
