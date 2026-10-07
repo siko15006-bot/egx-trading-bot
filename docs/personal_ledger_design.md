@@ -83,3 +83,12 @@ preceding 2 trading sessions (`tg_signals`, `tg_raw`, `h3_forward`, scanner BUY 
 
 One small fixture built from 3–4 real rows (anonymised amounts) covering: buy, partial sell, full sell, dividend,
 T0 refund; asserts on parsed fills, FIFO round trips, fee recomputation and the duplicate-import guard.
+
+## Open design notes (from the Gemini test review of f4739c5, 2026-10-07 — decided, not yet implemented)
+
+- **Money storage:** `REAL` columns (price, gross_value, fees, amounts) are binary floats. Before real data is
+  written, switch money to integer piasters (EGP × 100; prices at the exchange's tick size if finer) or SQLite
+  `NUMERIC` with values passed as `Decimal`, and do the arithmetic in `Decimal` (Codex's tests already compare
+  with `Decimal`). Not urgent while the tables are empty; must be settled together with the parser.
+- **`validate_balance`:** the oversell check ("no SELL larger than the open position") must run on the fills alone,
+  always — it must not depend on the optional `holdings` argument, which only adds the reconciliation with the app.
