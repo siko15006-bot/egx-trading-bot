@@ -41,8 +41,10 @@ def test_replay_rules() -> None:
     assert r((100, 100, 94, 94))["status"] == "skipped"          # next close already below the stop
     t = r(fill, (100, 111, 94, 100))                              # same bar hits SL and TP → SL first
     assert (t["exit"], t["reason"]) == (95, "SL")
-    t = r(fill, (90, 92, 88, 91))                                 # whole bar below the stop → best traded price
-    assert (t["exit"], t["reason"]) == (92, "SL")
+    t = r(fill, (90, 92, 88, 91))                                 # opened below the stop on a real open → market at 90
+    assert (t["exit"], t["reason"]) == (90, "SL")
+    t = r(fill, (100, 92, 88, 91))                                # fake open (= previous close, outside range) → close
+    assert (t["exit"], t["reason"]) == (91, "SL")
     # real ABUK 2026-03-08 bar: Open 77.93 below Low 83.0; stop 80 was never touched → no exit
     abuk = auto_sim.replay(_bars([(86, 87, 85, 86), (86, 87, 85, 86), (77.93, 91.5, 83.0, 87.0)]), "2026-09-01", 80, 95, 2)
     assert abuk["status"] == "open"
@@ -50,8 +52,8 @@ def test_replay_rules() -> None:
     assert t["stop"] == 100 and (t["exit"], t["reason"]) == (100, "TRAIL_SL")
     t = r(fill, (101, 111, 100, 109))
     assert (t["exit"], t["reason"]) == (110, "TP")
-    t = r(fill, (60, 62, 58, 60))                                 # −40% close-to-close = data break
-    assert (t["reason"], t["exit"]) == ("DATA_BREAK", 100)
+    t = r(fill, (60, 62, 58, 60))                                 # −40% close-to-close = data break → cancelled
+    assert (t["status"], t["reason"]) == ("cancelled", "DATA_BREAK")
 
 
 def test_update_closes_with_engine_pnl() -> None:
@@ -63,6 +65,16 @@ def test_update_closes_with_engine_pnl() -> None:
     assert row.status == "CLOSED" and row.exit_reason == "TP" and row.exit_date == "2026-09-03" and row.entry == 101
     assert abs(row.pnl_egp - eng.net_trade_pnl(101, 110, 10, RISK)) < 1e-9
     assert "ABANDON" in auto_sim.summary_line(db) and "مغلقة: 1" in auto_sim.summary_line(db)
+
+
+def test_data_break_cancels_without_pnl() -> None:
+    db = Path(tempfile.mkdtemp()) / "t.db"
+    auto_sim.open_new(_signals(("ZZZ.CA", 2.0)), "2026-09-01", db)
+    data = {"ZZZ.CA": _bars([(100, 100, 100, 100), (101, 101.5, 100.5, 101), (50, 51, 49, 50)])}
+    assert auto_sim.update_open(data, RISK, db) == 0
+    row = auto_sim.load(db).iloc[0]
+    assert row.status == "CANCELLED" and row.exit_reason == "DATA_BREAK" and pd.isna(row.pnl_egp)
+    assert "مغلقة: 0" in auto_sim.summary_line(db)
 
 
 if __name__ == "__main__":

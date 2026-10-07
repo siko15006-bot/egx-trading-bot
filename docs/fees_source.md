@@ -22,8 +22,7 @@ Invoice component rounding rules are UNKNOWN; no per-component rounding.
 Annual custody fees and subscriptions are excluded. Existing capital-gains
 and dividend tax assumptions are NOT verified by this tariff article.
 
-Close-of-signal-bar entry remains a diagnostic assumption, not demonstrated
-execution. Exit scanning now begins on the next bar. Gap fills still use
-unverified Yahoo Open values in optimizer/auto_sim; core has no gap model.
-Fees are shared across these paths, but execution models are NOT identical.
+Execution (entry, stop/target fills, filler rows, data breaks) is now one shared policy
+for core, optimizer and auto_sim: see docs/execution_policy.md (2026-10-07). The note
+that originally stood here (close-of-signal entry, Open-based gap fills) is superseded.
 No production source, prices, CSVs or databases were modified.

@@ -121,17 +121,22 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
 `egx_4_mirrors_v3.simulate_trade` / `stop_fill` / `target_fill` / `data_breaks`.
 
 - **Yahoo's EGX Open is not an opening price.** On `data/` real bars it equals the previous Close 98.2% of the time
-  and lies outside [Low, High] 18.2% of the time. No path fills at the Open any more (the old auto_sim/optimizer gap
-  fills could exit at a price the stock never traded — repro: ABUK 2026-03-08, Open 77.93 below Low 83.0).
+  and lies outside [Low, High] 18.2% of the time. A gap fill uses the Open only when it is a real price (inside
+  [Low, High] and ≠ previous close), else that bar's close — repro of the old bug: ABUK 2026-03-08, Open 77.93 below
+  Low 83.0, filled at a price the stock never traded.
   `Gap_Pct` in the signal screen still uses it and is therefore close to 0 on most bars (strategy is ABANDON anyway).
 - **Entry = close of the session after the signal.** Signals are computed after the close (daily runner 14:45, data
   cutoff 14:30), so the signal-day close is not executable. Exits are checked from the bar after the entry bar.
-- **Fills stay inside the bar:** stop → min(stop, High); target → max(target, Low). SL is checked before TP.
-- **Data breaks:** a traded bar whose move since the previous traded bar exceeds 25% per elapsed session (EGX daily
-  limits are ±20%; Yahoo filler rows count as sessions) marks an unadjusted or misdated corporate action. Trades are
-  closed at the last valid close (`DATA_BREAK`), and the scanner reports `DATA_BREAK` instead of a signal for 60 bars.
-  Found on `data/` (2025-10 → 2026-10): AFMC, AMES, CANA, EFID (2026-09-20, Yahoo dates the split 09-29), EXPA,
-  HDBK (2026-06-29, −49.6%, Yahoo dates the 2:1 split 07-08), INFI, JUFO, ORHD, RMDA, SKPC.
+- **Fills, filler rows, data breaks (superseded 2026-10-07 by `docs/execution_policy.md`):** stop/target fill at
+  the level, or on a gap at a real open (else the bar's close); zero-volume rows never fill; a move beyond ±25% per
+  elapsed session either way is a data break and a trade across it is **cancelled** (excluded and counted), not
+  closed retroactively. The scanner reports `DATA_BREAK` instead of a signal for 60 bars.
+  Found on `data/` (2025-10 → 2026-10), symmetric ±25% threshold, 7 break bars in 7 stocks: AMES 04-19 (−48.7%),
+  CANA 04-06 (−36.4%), EFID 09-20 (−32.7%, Yahoo dates the split 09-29), EXPA 09-28 (−25.8%), HDBK 06-29 (−49.6%,
+  Yahoo dates the 2:1 split 07-08), INFI 02-09 (−29.2%), ORHD 09-28 (−69.7%). (AFMC, JUFO, RMDA, SKPC were flagged
+  by the old asymmetric threshold only — moves inside the ±20% daily limit band, not breaks.)
+  Backtest on `data/` (2026-10-07, 90 stocks × 100k, dividends added): 309 trades, net +68,411 EGP, 2 trades
+  cancelled (EXPA, INFI → `outputs/data_breaks_log.csv`); before this policy 315 trades, +66,910.
   Correction: the 2026-10-06 note that EFID's split is "already inside data/" was wrong — the comparison used two
   Yahoo series with the same misdating.
 - **Slippage:** `RiskConfig.slippage_bps` (default 10, an assumption — no fill data yet), applied per side in

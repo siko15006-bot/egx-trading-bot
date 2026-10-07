@@ -7,9 +7,10 @@ Rules (fixed, same as egx_4_mirrors_v3.backtest except where noted):
 - Each daily run opens the top 2 BUY rows of scan_universe, ranked by RR_Net desc, then ticker A→Z.
   Skipped if that ticker already has an OPEN auto-sim trade. Stored entry starts as the signal close and is replaced
   by the real fill (next session close) once that bar exists.
-- Same execution rules as the engine (egx_4_mirrors_v3.simulate_trade): entry at the close of the session after the
-  signal, exits from the bar after that, SL before TP, fills always inside the bar's [Low, High] (no Open: Yahoo's EGX
-  Open is not a real opening price), and no trade carried across a >25% data break.
+- Same execution policy as the engine (egx_4_mirrors_v3.simulate_trade, docs/execution_policy.md): entry at the close
+  of the session after the signal, exits from the bar after that, SL before TP, stop/target at the level or at a real
+  open on a gap (else that bar's close), no fills on zero-volume rows, and a >25% data break cancels the trade
+  (status CANCELLED, no P&L).
 - Trailing stop exactly as the engine: Close ≥ entry+2·ATR → stop ≥ entry+ATR; Close ≥ entry+ATR → stop ≥ entry.
 - PnL via egx_4_mirrors_v3.net_trade_pnl, including net dividends (data/ is dividend-unadjusted).
 """
@@ -65,8 +66,12 @@ def update_open(data_map: Mapping[str, pd.DataFrame], risk: eng.RiskConfig, db_p
             t = replay(data, sdate, stop0, tp, atr)
             if t["status"] == "pending":
                 continue
-            if t["status"] == "skipped":  # next close already beyond the stop/target, or a data break
+            if t["status"] == "skipped":  # next close already beyond the stop/target, a filler bar, or a data break
                 con.execute("UPDATE auto_sim_trades SET status='SKIPPED', exit_reason='ENTRY_INVALID' WHERE id=?", (tid,))
+                continue
+            if t["status"] == "cancelled":  # data break while open: outcome unknown, no P&L (docs/execution_policy.md)
+                con.execute("UPDATE auto_sim_trades SET status='CANCELLED', entry=?, exit_reason='DATA_BREAK' WHERE id=?",
+                            (t["entry"], tid))
                 continue
             entry = t["entry"]
             if t["status"] == "open":

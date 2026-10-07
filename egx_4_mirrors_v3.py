@@ -101,6 +101,11 @@ class RiskConfig:
     # Assumption, not measured (no fill data yet): fixed cost per side on top of fees. Buys fill higher, sells lower.
     slippage_bps: float = 10.0
 
+    def __post_init__(self) -> None:
+        # A cost can't be negative (it would turn a flat trade into a profit) and 10,000 bps would zero the sale price.
+        if not (np.isfinite(self.slippage_bps) and 0 <= self.slippage_bps <= 1000):
+            raise ValueError(f"slippage_bps must be finite and within 0..1000, got {self.slippage_bps!r}")
+
 
 @dataclass(frozen=True)
 class SystemConfig:
@@ -441,17 +446,19 @@ def with_dividends(ticker: str, df: pd.DataFrame, actions_csv: Path = ACTIONS_CS
 
 
 # توزيعات/سهم بتاريخ استحقاق في الشموع (i, j]: ماسك السهم في إغلاق i ولسه ماسكه قبل افتتاح يوم الاستحقاق.
-# ---- Execution conventions shared by backtest, backtest_optimizer and auto_sim (red-team review 2026-10-07) ----
-# Yahoo's EGX Open equals the previous Close on ~98% of bars and lies outside [Low, High] on ~18%
-# (KNOWN_ISSUES.md), so no path fills at the Open: every fill is a price the bar actually traded.
-# EGX daily price limits keep normal moves within ±20%; a bigger close-to-close jump is an unadjusted or misdated
-# corporate action (e.g. HDBK −49.6% on 2026-06-29), so no trade is carried across it.
+# ---- Execution policy shared by backtest, backtest_optimizer and auto_sim — docs/execution_policy.md ----
+# Stop/target: Thndr stop orders sell at market when the level trades (confirmed with Thndr 2026-10-07): a level hit
+# inside the bar fills at the level; a bar that opens beyond it fills at the open — but only a real open (Yahoo's EGX
+# Open equals the previous Close on ~98% of bars and lies outside [Low, High] on ~18%), otherwise at that bar's close.
+# Filler rows (Volume 0, Yahoo gaps) never fill. A >25% move per elapsed session either way (EGX limits ±20%) marks an
+# unadjusted/misdated corporate action: a trade across it is cancelled (outcome unknown), never closed retroactively.
 MAX_DAILY_MOVE = 0.25
 
 
 def data_breaks(data: pd.DataFrame) -> np.ndarray:
-    """True on traded bars whose move since the previous traded bar exceeds MAX_DAILY_MOVE per elapsed session.
-    Filler rows (Volume 0, Yahoo gaps) count as elapsed sessions, so a real 3-session move after a gap is not a break."""
+    """True on traded bars whose move since the previous traded bar is beyond ±MAX_DAILY_MOVE per elapsed session
+    (arithmetic, symmetric: k sessions allow ×(1.25)^k up and ×(0.75)^k down, so a −20% limit-down day is never a break).
+    Filler rows (Volume 0) count as elapsed sessions, so a real 3-session move after a gap is not a break."""
     close = data["Close"].to_numpy(dtype=float)
     real = data["Volume"].to_numpy(dtype=float) > 0
     pos = np.arange(len(close))
@@ -459,41 +466,56 @@ def data_breaks(data: pd.DataFrame) -> np.ndarray:
     out = np.zeros(len(close), dtype=bool)
     ok = real & ~np.isnan(prev)
     p = prev[ok].astype(int)
-    out[ok] = np.abs(np.log(close[ok] / close[p])) > (pos[ok] - p) * np.log1p(MAX_DAILY_MOVE)
+    lr, k = np.log(close[ok] / close[p]), pos[ok] - p
+    out[ok] = (lr > k * np.log1p(MAX_DAILY_MOVE)) | (lr < k * np.log1p(-MAX_DAILY_MOVE))
     return out
 
 
-def stop_fill(bar: pd.Series, stop: float) -> float:
-    return min(stop, float(bar["High"]))  # a bar entirely below the stop fills at its best traded price
+def is_filler(bar: pd.Series) -> bool:
+    return float(bar["Volume"]) <= 0
 
 
-def target_fill(bar: pd.Series, target: float) -> float:
-    return max(target, float(bar["Low"]))
+def _gap_fill(data: pd.DataFrame, j: int) -> float:
+    """Market fill for a bar that opened beyond the level: its open if that is a real price, else its close."""
+    bar = data.iloc[j]
+    o = float(bar["Open"])
+    real_open = bar["Low"] <= o <= bar["High"] and (j == 0 or o != float(data["Close"].iloc[j - 1]))
+    return o if real_open else float(bar["Close"])
+
+
+def stop_fill(data: pd.DataFrame, j: int, stop: float) -> float:
+    return stop if data["High"].iloc[j] >= stop else _gap_fill(data, j)  # touched inside the bar → the stop
+
+
+def target_fill(data: pd.DataFrame, j: int, target: float) -> float:
+    return target if data["Low"].iloc[j] <= target else _gap_fill(data, j)
 
 
 def simulate_trade(data: pd.DataFrame, i: int, stop0: float, target: float, atr: float,
                    breaks: Optional[np.ndarray] = None) -> dict[str, Any]:
     """One long trade from a signal on bar i. The signal is only known after bar i closes, so the entry is the close of
-    bar i+1; exits are checked from bar i+2. status: pending (no bar i+1 yet), skipped (entry invalid), open, closed."""
+    bar i+1; exits are checked from bar i+2. status: pending (no bar i+1 yet), skipped (entry bar invalid),
+    cancelled (a data break while open: outcome unknown, excluded from results), open, closed."""
     breaks = data_breaks(data) if breaks is None else breaks
     e = i + 1
     if e >= len(data):
         return {"status": "pending"}
     entry = float(data["Close"].iloc[e])
-    if breaks[e] or not stop0 < entry < target:
+    if breaks[e] or is_filler(data.iloc[e]) or not stop0 < entry < target:
         return {"status": "skipped", "entry_index": e}
     stop = stop0
     for j in range(e + 1, len(data)):
         if breaks[j]:
-            return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j - 1,
-                    "exit": float(data["Close"].iloc[j - 1]), "reason": "DATA_BREAK", "stop": stop}
+            return {"status": "cancelled", "entry_index": e, "entry": entry, "break_index": j, "reason": "DATA_BREAK"}
         bar = data.iloc[j]
+        if is_filler(bar):
+            continue
         if bar["Low"] <= stop:
-            return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j, "exit": stop_fill(bar, stop),
+            return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j, "exit": stop_fill(data, j, stop),
                     "reason": "TRAIL_SL" if stop > stop0 else "SL", "stop": stop}
         if bar["High"] >= target:
             return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j,
-                    "exit": target_fill(bar, target), "reason": "TP", "stop": stop}
+                    "exit": target_fill(data, j, target), "reason": "TP", "stop": stop}
         if bar["Close"] >= entry + 2 * atr:
             stop = max(stop, entry + atr)
         elif bar["Close"] >= entry + atr:
@@ -542,6 +564,8 @@ def net_trade_pnl(entry: float, exit_price: float, shares: int, risk: RiskConfig
 # منحنى Buy & Hold بالتوزيعات الصافية (من غير إعادة استثمار) — نفس معاملة الاستراتيجية.
 def buy_hold_curve(data: pd.DataFrame, start: int, capital: float, risk: RiskConfig) -> pd.Series:
     close = data["Close"].iloc[start:]
+    if close.empty:  # window entirely outside the data
+        return pd.Series(dtype=float)
     divs = data["Dividends"].iloc[start:].copy() if "Dividends" in data.columns else pd.Series(0.0, index=close.index)
     divs.iloc[0] = 0.0
     return capital * (close + divs.cumsum() * (1 - risk.dividend_tax_pct)) / float(close.iloc[0])
@@ -578,10 +602,12 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
             "buy_hold_final_equity": equity,
             "trades": empty,
             "equity_curve": empty,
+            "data_break_trades": empty,
         }
 
     equity_events.append((data.index[start_index], equity))
     breaks = data_breaks(data)
+    cancelled: list[dict[str, Any]] = []
 
     while i < len(data) - 1:
         window = data.iloc[: i + 1]
@@ -595,6 +621,13 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
         t = simulate_trade(data, i, plan.stop_loss, plan.take_profit, plan.atr, breaks)
         if t["status"] in ("pending", "skipped"):
             i += 1
+            continue
+        if t["status"] == "cancelled":  # excluded from results, counted and logged
+            cancelled.append({"Signal_Date": data.index[i], "Entry_Date": data.index[t["entry_index"]],
+                              "Break_Date": data.index[t["break_index"]], "Entry": t["entry"],
+                              "Close_Before": float(data["Close"].iloc[t["break_index"] - 1]),
+                              "Close_At_Break": float(data["Close"].iloc[t["break_index"]])})
+            i = t["break_index"]
             continue
         entry, exit_price, exit_index, exit_reason = t["entry"], t["exit"], t["exit_index"], t["reason"]
 
@@ -662,6 +695,7 @@ def backtest(df: pd.DataFrame, cfg: SystemConfig) -> dict[str, Any]:
         "buy_hold_final_equity": cfg.risk.capital * (1 + buy_hold_return),
         "trades": pd.DataFrame(trades),
         "equity_curve": equity_curve,
+        "data_break_trades": pd.DataFrame(cancelled),
     }
 
 
@@ -829,11 +863,20 @@ def main() -> None:
         signals.to_csv(args.out, index=False, encoding="utf-8-sig")
 
     if args.backtest:
+        breaks_log = []
         for ticker, data in data_map.items():
             stats = backtest(with_dividends(ticker, data) if dividend_mode == "add" else data, system_cfg)
             print(f"\nBacktest {ticker}")
             for key, value in stats.items():
                 print(f"{key}: {value}")
+            if not stats["data_break_trades"].empty:
+                breaks_log.append(stats["data_break_trades"].assign(Ticker=ticker))
+        log_path = Path(__file__).with_name("outputs") / "data_breaks_log.csv"  # trades cancelled by a data break
+        log_path.parent.mkdir(exist_ok=True)
+        (pd.concat(breaks_log, ignore_index=True) if breaks_log else pd.DataFrame(
+            columns=["Ticker", "Signal_Date", "Entry_Date", "Break_Date", "Entry", "Close_Before", "Close_At_Break"])
+         ).to_csv(log_path, index=False)
+        print(f"\nCancelled by data breaks: {sum(len(b) for b in breaks_log)} → {log_path}")
 
     assert not signals.empty
 

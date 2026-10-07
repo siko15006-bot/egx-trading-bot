@@ -104,7 +104,7 @@ def main() -> int:
                   and hit["confidence"] in pdx.CONFIDENCE_RANK and isinstance(hit["arabic_note"], str))
         others = [n for n, (_, d) in FIXTURES.items() if n != name and d(df) is not None]
         combined = pdx.detect_breakout_pattern(df)
-        check(f"detect_breakout_pattern on {name} fixture", combined["pattern"] != "NONE" and "levels" in combined,
+        check(f"detect_breakout_pattern on {name} fixture", combined["pattern"] == name and "levels" in combined,  # the fixture's own pattern, not any detector
               f"-> {combined['pattern']}/{combined['confidence']} (other detectors also firing: {others})")
 
     # 2) تحكم سلبي: مسارات عشوائية بدون نموذج مقصود
@@ -153,11 +153,13 @@ def main() -> int:
     # 5) Demo + حقيقي: بطاقات لأسهم مختلفة
     demo_cards = [s for s in build_setups(demo, sig, risk)]
     all_cards = [s for _, _, s in produced]
-    check("demo 5 stocks analysed", len(demo) == 5, f"cards: {[(s.ticker, s.quality, s.pattern, s.rr) for s in demo_cards]}")
+    check("demo 5 stocks analysed", len(demo) == 5 and len(demo_cards) > 0, f"cards: {[(s.ticker, s.quality, s.pattern, s.rr) for s in demo_cards]}")
     check("cards appear for different stocks", len({s.ticker for s in all_cards}) >= 2,
           f"{[(s.ticker, s.quality, s.pattern, s.rr) for s in all_cards]}")
-    check("real EGX data analysed (informational)", True,
-          f"{len(real)} tickers, cards: {[(s.ticker, s.quality, s.rr) for s in build_setups(real, sig, risk)]}")
+    real_cards = build_setups(real, sig, risk)
+    check("real EGX data analysed: every card keeps rr>=2 and stop below activation", len(real) > 0 and all(
+          s.rr >= 2 and s.stop_loss < s.activation for s in real_cards),
+          f"{len(real)} tickers, cards: {[(s.ticker, s.quality, s.rr) for s in real_cards]}")
 
     # 6) تبويب 8 في الداشبورد (AppTest): Demo، بيانات حقيقية، وبدون بيانات + التصدير
     from streamlit.testing.v1 import AppTest
@@ -191,7 +193,8 @@ def main() -> int:
     best = [c for c in (build_setup("ETEL.CA", etel.iloc[: i + 1], sig, risk) for i in range(60, len(etel))) if c and c.quality == "BEST"] if etel is not None else []
     check("BEST notes carry the matching mirrors label (ETEL history)", len(best) > 0 and all(c.note.startswith(mirrors_label(c.mirrors_count)) for c in best),
           f"BEST cards={len(best)} counts={sorted({c.mirrors_count for c in best})}")
-    check("non-BEST notes unchanged (no label)", all(not s.note.startswith("📊") for s in all_cards if s.quality != "BEST"))
+    non_best = [s for s in all_cards if s.quality != "BEST"]
+    check("non-BEST notes unchanged (no label)", len(non_best) > 0 and all(not s.note.startswith("📊") for s in all_cards if s.quality != "BEST"))
     at = AppTest.from_file(str(HERE / "egx_dashboard.py"), default_timeout=300)
     at.run()
     at.sidebar.radio[0].set_value("Demo Data").run()

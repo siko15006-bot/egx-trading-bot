@@ -27,6 +27,11 @@ def _cache(folder, last_day: str, days: int = 5) -> str:
     return path.read_text()
 
 
+def _disk(folder) -> pd.DataFrame:
+    """What download_ticker actually left on disk — the returned DownloadResult alone can be stale (Codex audit)."""
+    return pd.read_csv(folder / f"{SYM}.csv")
+
+
 def _fake(monkeypatch, frame):
     monkeypatch.setattr(dd.yf, "download", lambda *a, **k: frame.copy())
 
@@ -36,6 +41,9 @@ def test_newer_valid_data_is_saved_even_if_not_today(tmp_path, monkeypatch):
     _fake(monkeypatch, _yahoo("2026-10-04"))
     result = dd.download_ticker(SYM, tmp_path)
     assert result.last_date == "2026-10-04"
+    saved = _disk(tmp_path)
+    assert saved["Date"].iloc[-1] == "2026-10-04" and len(saved) == 5
+    assert list(saved.columns) == ["Date", "Open", "High", "Low", "Close", "Volume"]
 
 
 def test_older_data_never_overwrites_newer_cache(tmp_path, monkeypatch):
@@ -50,6 +58,8 @@ def test_same_day_refresh_is_allowed(tmp_path, monkeypatch):
     _cache(tmp_path, "2026-10-04")
     _fake(monkeypatch, _yahoo("2026-10-04", Close=101.5, High=102.0))
     assert dd.download_ticker(SYM, tmp_path).last_date == "2026-10-04"
+    saved = _disk(tmp_path)
+    assert (saved["Close"] == 101.5).all() and saved["Date"].iloc[-1] == "2026-10-04"
 
 
 @pytest.mark.parametrize("bad", [
@@ -77,6 +87,7 @@ def test_row_count_guards(tmp_path, monkeypatch, yahoo_rows, cached_rows, accept
     _fake(monkeypatch, _yahoo("2026-10-04", yahoo_rows))
     if accepted:
         assert dd.download_ticker(SYM, tmp_path).rows == yahoo_rows
+        assert len(_disk(tmp_path)) == yahoo_rows
     else:
         with pytest.raises(Exception) as err:
             dd.download_ticker(SYM, tmp_path)
@@ -92,6 +103,10 @@ def test_lowering_limit_shrinks_cache_instead_of_deadlocking(tmp_path, monkeypat
     _cache(tmp_path, "2026-10-04", 250)
     _fake(monkeypatch, _yahoo("2026-10-04", 250))
     assert dd.download_ticker(SYM, tmp_path, limit=100).rows == 100
+    saved = _disk(tmp_path)
+    expected = _yahoo("2026-10-04", 250).index[-100:].strftime("%Y-%m-%d").tolist()
+    assert saved["Date"].tolist() == expected   # the newest 100 sessions, not any 100
+    assert saved["Volume"].dtype.kind in "iuf" and (saved["Close"] == 101.0).all()
 
 
 def test_corrupt_cache_replaced_with_warning(tmp_path, monkeypatch, caplog):
@@ -100,6 +115,25 @@ def test_corrupt_cache_replaced_with_warning(tmp_path, monkeypatch, caplog):
     with caplog.at_level(logging.WARNING):
         assert dd.download_ticker(SYM, tmp_path).last_date == "2026-10-04"
     assert "cached CSV unreadable" in caplog.text
+    saved = _disk(tmp_path)   # the unreadable file was really replaced by a readable one
+    assert saved["Date"].iloc[-1] == "2026-10-04" and {"Open", "High", "Low", "Close", "Volume"} <= set(saved.columns)
+
+
+def test_atomic_write_failure_preserves_old_cache(tmp_path, monkeypatch):
+    before = _cache(tmp_path, "2026-10-01")
+    _fake(monkeypatch, _yahoo("2026-10-04"))
+
+    def boom(src, dst):
+        raise OSError("disk full")
+    monkeypatch.setattr(dd.os, "replace", boom)
+    with pytest.raises(OSError, match="disk full"):
+        dd.download_ticker(SYM, tmp_path)
+    assert (tmp_path / f"{SYM}.csv").read_text() == before
+    assert not list(tmp_path.glob(".*.tmp"))   # no temporary file left behind
+    monkeypatch.undo()                         # retry after the failure succeeds
+    _fake(monkeypatch, _yahoo("2026-10-04"))
+    dd.download_ticker(SYM, tmp_path)
+    assert _disk(tmp_path)["Date"].iloc[-1] == "2026-10-04"
 
 
 @pytest.mark.parametrize("override, reason", [
