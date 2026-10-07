@@ -41,10 +41,9 @@ def test_replay_rules() -> None:
     assert r((100, 100, 94, 94))["status"] == "skipped"          # next close already below the stop
     t = r(fill, (100, 111, 94, 100))                              # same bar hits SL and TP → SL first
     assert (t["exit"], t["reason"]) == (95, "SL")
-    t = r(fill, (90, 92, 88, 91))                                 # opened below the stop on a real open → market at 90
-    assert (t["exit"], t["reason"]) == (90, "SL")
-    t = r(fill, (100, 92, 88, 91))                                # fake open (= previous close, outside range) → close
-    assert (t["exit"], t["reason"]) == (91, "SL")
+    for open_ in (90, 100):                                       # gap below the stop → that bar's Close, never its
+        t = r(fill, (open_, 92, 88, 91))                          # Open (in-range or not; Ahmed 2026-10-08)
+        assert (t["exit"], t["reason"]) == (91, "SL")
     # real ABUK 2026-03-08 bar: Open 77.93 below Low 83.0; stop 80 was never touched → no exit
     abuk = auto_sim.replay(_bars([(86, 87, 85, 86), (86, 87, 85, 86), (77.93, 91.5, 83.0, 87.0)]), "2026-09-01", 80, 95, 2)
     assert abuk["status"] == "open"

@@ -462,7 +462,7 @@ def _table(runs: dict, bh: dict) -> list[str]:
 def build_report(trail: dict, best_trail: float, main_runs: dict, main_bh: dict, full_runs: dict, full_bh: dict,
                  trough_runs: dict, trough_bh: dict, fx_move: float, best: str, rec: str, same_bar: int) -> str:
     L = [f"# Optimization Report v2 — 4 Mirrors v3 + Hybrid (generated {datetime.now():%Y-%m-%d %H:%M})", "",
-         "Execution is **realistic for every number in this report**: entry at the close after the signal, first exit on the bar after that; fills per `docs/execution_policy.md` (level, real open on a gap, else close; zero-volume rows never fill; trades across a data break cancelled). "
+         "Execution is **realistic for every number in this report**: entry at the close after the signal, first exit on the bar after that; fills per `docs/execution_policy.md` (level, or that bar's Close on a gap — never the Open; zero-volume rows never fill; trades across a data break cancelled). "
          "A/B/C/Baseline = one independent 100,000 EGP account per stock; D = one shared account of the same total; Buy & Hold = equal weight, same window.", "",
          "## 1.2 Look-ahead", "",
          f"The simulator in engine logic reproduces `egx_4_mirrors_v3.backtest()` exactly; that logic had **{same_bar} exits on the entry bar**. "

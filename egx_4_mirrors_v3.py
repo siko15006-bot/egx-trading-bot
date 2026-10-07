@@ -448,8 +448,9 @@ def with_dividends(ticker: str, df: pd.DataFrame, actions_csv: Path = ACTIONS_CS
 # توزيعات/سهم بتاريخ استحقاق في الشموع (i, j]: ماسك السهم في إغلاق i ولسه ماسكه قبل افتتاح يوم الاستحقاق.
 # ---- Execution policy shared by backtest, backtest_optimizer and auto_sim — docs/execution_policy.md ----
 # Stop/target: Thndr stop orders sell at market when the level trades (confirmed with Thndr 2026-10-07): a level hit
-# inside the bar fills at the level; a bar that opens beyond it fills at the open — but only a real open (Yahoo's EGX
-# Open equals the previous Close on ~98% of bars and lies outside [Low, High] on ~18%), otherwise at that bar's close.
+# inside the bar fills at the level; a bar that gapped beyond it fills at that bar's Close. Open is never used
+# (Ahmed 2026-10-08): Yahoo's EGX Open equals the previous Close on ~98% of bars and lies outside [Low, High] on ~18%,
+# and even an in-range Open is no proof of an executable opening price; the Close is a price that certainly traded.
 # Filler rows (Volume 0, Yahoo gaps) never fill. A >25% move per elapsed session either way (EGX limits ±20%) marks an
 # unadjusted/misdated corporate action: a trade across it is cancelled (outcome unknown), never closed retroactively.
 MAX_DAILY_MOVE = 0.25
@@ -475,20 +476,13 @@ def is_filler(bar: pd.Series) -> bool:
     return float(bar["Volume"]) <= 0
 
 
-def _gap_fill(data: pd.DataFrame, j: int) -> float:
-    """Market fill for a bar that opened beyond the level: its open if that is a real price, else its close."""
-    bar = data.iloc[j]
-    o = float(bar["Open"])
-    real_open = bar["Low"] <= o <= bar["High"] and (j == 0 or o != float(data["Close"].iloc[j - 1]))
-    return o if real_open else float(bar["Close"])
-
-
 def stop_fill(data: pd.DataFrame, j: int, stop: float) -> float:
-    return stop if data["High"].iloc[j] >= stop else _gap_fill(data, j)  # touched inside the bar → the stop
+    # touched inside the bar → the stop; the whole bar below it (gap) → that bar's Close, never its Open
+    return stop if data["High"].iloc[j] >= stop else float(data["Close"].iloc[j])
 
 
 def target_fill(data: pd.DataFrame, j: int, target: float) -> float:
-    return target if data["Low"].iloc[j] <= target else _gap_fill(data, j)
+    return target if data["Low"].iloc[j] <= target else float(data["Close"].iloc[j])
 
 
 def simulate_trade(data: pd.DataFrame, i: int, stop0: float, target: float, atr: float,
