@@ -95,7 +95,52 @@ CREATE TABLE IF NOT EXISTS trip_sources (        -- derived: which signal a BUY 
 """
 
 
+# Explicit migrations on top of the frozen SCHEMA (PRAGMA user_version = number applied). Never edit one once applied.
+MIGRATIONS = [
+    # 1 (2026-10-07, Ahmed): fund sub-account + new cash kinds + per-account balances for the import chain check.
+    """
+    CREATE TABLE fund_holdings (     -- Thndr fund sub-account (*_02 statements): units, not shares; no fees, no FIFO
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_id INTEGER NOT NULL REFERENCES imports(id),
+        row_no INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        fund_code TEXT NOT NULL,
+        fund_name TEXT,
+        operation TEXT NOT NULL CHECK (operation IN ('BUY', 'SELL')),
+        units REAL NOT NULL CHECK (units > 0),
+        unit_price REAL,
+        value REAL NOT NULL,
+        balance REAL,
+        UNIQUE (import_id, row_no)
+    );
+    CREATE TABLE cash_events_v1 (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        import_id INTEGER NOT NULL REFERENCES imports(id),
+        row_no INTEGER NOT NULL,
+        ts_cairo TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('dividend', 'stamp_refund', 'commission_kickback', 'custody_fee',
+                                           'subscription', 'deposit', 'withdrawal', 'other',
+                                           'subscription_fee', 'commission_refund', 'transfer_to_fund',
+                                           'transfer_from_fund')),
+        ticker TEXT,
+        amount REAL NOT NULL,
+        review_flag TEXT CHECK (review_flag IN ('POSSIBLE_DUPLICATE')),
+        UNIQUE (import_id, row_no)
+    );
+    INSERT INTO cash_events_v1 SELECT * FROM cash_events;
+    DROP TABLE cash_events;
+    ALTER TABLE cash_events_v1 RENAME TO cash_events;
+    ALTER TABLE imports ADD COLUMN account TEXT;            -- 'main' | 'fund'
+    ALTER TABLE imports ADD COLUMN opening_balance REAL;
+    ALTER TABLE imports ADD COLUMN closing_balance REAL;
+    """,
+]
+
+
 def init_db(path: Path = DB_PATH) -> Path:
     with sqlite3.connect(path) as con:
         con.executescript(SCHEMA)
+        done = con.execute("PRAGMA user_version").fetchone()[0]
+        for n, sql in enumerate(MIGRATIONS[done:], start=done + 1):
+            con.executescript(f"BEGIN; {sql} PRAGMA user_version = {n}; COMMIT;")
     return path
