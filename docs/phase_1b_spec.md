@@ -142,8 +142,8 @@ denominator or switch between max and p95 is permitted.
   intratrade mark-to-market and dependence. It is NOT shared-account simulation.
 - Report median and p95 max DD, baseline non-resampled DD on the same denominator,
   p95/baseline ratio (NOT_AVAILABLE if baseline DD is zero), and worst-stock DD.
-- Report the baseline concurrency histogram and median/p95/max open positions;
-  freeze observation-grid and same-day overlap conventions before measurement.
+- Report both baseline exposure histograms and median/p95/max counts using
+  the frozen concurrency definition below.
   Concurrency is informational, not resampled and not used in the denominator.
 
 Gate: p95 max DD <= 15% of NOTIONAL_DENOMINATOR. Status: DISABLED until this
@@ -152,13 +152,41 @@ for a sanity check, and a separate explicit gate-enablement decision is recorded
 Do not enable the gate from this spec alone. A non-binding baseline gate is
 reported as such, not repaired by tuning the denominator after results.
 
-Capacity Violation is a separate boolean: did baseline concurrency exceed
+Capacity Violation is a separate boolean: did Measure B concurrency exceed
 N_SLOTS? It neither implies nor is implied by a DD breach. No capacity ranking,
 re-entry or rejection rule is defined here. Realistically enforcing capacity
 requires a runner change, outside this Phase 1b approximation.
 
 Buy & hold is reported, not an acceptance gate. Use only benchmarks actually
 present in the inputs; name the dataset and dividend/cost conventions.
+
+### Concurrency definition: FROZEN
+
+Basis: sorted union of observed candle dates across all dataset stocks,
+normalized to Africa/Cairo calendar dates. Include dates with zero exposure;
+this is not an official exchange calendar or merely trade endpoint dates.
+"Intraday exposure" means a position was held during the day, not necessarily
+at the day's close. Entry and exit dates both count, regardless of intraday
+ordering; this is a daily overlap convention, not exact simultaneous exposure.
+
+Measure A -- completed_exposure:
+- Count a completed trade on day d iff entry_date <= d <= exit_date.
+- Includes closed trades and end-of-window liquidations.
+
+Measure B -- known_exposure_including_cancelled:
+- Completed trade: entry_date <= d <= exit_date.
+- Cancelled trade: entry_date <= d < break_date.
+- Basis: completed trades plus known cancelled exposure before the break.
+  Exposure on break_date itself is UNKNOWN and is not counted. B is known
+  exposure up to the break, not full exposure.
+
+Report both daily series, histograms and median/p95/max. Neither exposure
+measure is an acceptance gate. MC denominator remains the frozen
+NOTIONAL_DENOMINATOR = 1,000,000 EGP.
+
+Capacity Violation uses B: max(B over the union date grid) > N_SLOTS (10).
+Report it separately as a boolean, independent of the disabled MC DD gate.
+A false value does not rule out capacity pressure during unknown break days.
 
 ## Decision 3: data source FROZEN
 
