@@ -54,3 +54,32 @@ def test_every_backtest_trade_starts_on_a_buy_signal() -> None:
         sig = TrendMirrors().generate_signals(d)
         trades = eng.backtest(d, eng.SystemConfig())["trades"]
         assert all(sig.loc[t] == BUY for t in (trades["Signal_Date"] if len(trades) else []))
+
+
+def test_mirror_rejections_add_up_and_counterfactual_holds(monkeypatch) -> None:
+    cfg = eng.SystemConfig()
+    real_eval = eng.evaluate_4_mirrors
+    for seed in (1, 2, 3, 4):
+        d = _fixture(seed)
+        c = eng.mirror_rejections(d, cfg)
+        assert c["bars"] == len(d) - 60
+        assert c["screen_fail"] + c["zero_volume"] + c["no_trend"] + c["mirror_bars"] == c["bars"]
+        assert c["buy"] == int((TrendMirrors().generate_signals(d) == BUY).sum())
+        for m in eng.MIRRORS:
+            assert c[f"{m}_sole"] <= c[f"{m}_fail"] <= c["mirror_bars"]
+
+            def without(df, sig, m=m):   # the mirror really removed: it always passes
+                ev = real_eval(df, sig)
+                if ev["mirrors"]:
+                    mirrors = {**ev["mirrors"], m: True}
+                    ev = {**ev, "mirrors": mirrors, "signal": "BUY" if all(mirrors.values()) else ev["signal"]}
+                return ev
+            monkeypatch.setattr(eng, "evaluate_4_mirrors", without)
+            assert eng.mirror_rejections(d, cfg)["buy"] - c["buy"] == c[f"{m}_sole"]
+            monkeypatch.setattr(eng, "evaluate_4_mirrors", real_eval)
+
+
+def test_mirror_rejection_table_renders() -> None:
+    c = eng.mirror_rejections(_fixture(1), eng.SystemConfig())
+    t = eng.mirror_rejection_table(c)
+    assert all(f"| {m} |" in t for m in eng.MIRRORS) and "Extra BUY signals if removed" in t
