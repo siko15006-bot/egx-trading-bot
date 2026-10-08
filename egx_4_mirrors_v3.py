@@ -848,6 +848,56 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+MIRRORS = ("Trend", "Momentum", "Volume", "Volatility")
+
+
+def mirror_rejections(data: pd.DataFrame, cfg: SystemConfig, start_index: int = 60) -> dict[str, int]:
+    """Measurement only (strategy factory, Phase 1a): why each bar from start_index on is not a BUY.
+    Gates first (screener fail, Volume 0, ADX below min); bars that pass them reach the 4 mirrors ("mirror_bars").
+    Per mirror: `<m>_fail` = bars it failed, `<m>_sole` = bars where it was the ONLY failing mirror. Removing that
+    mirror turns exactly those bars into BUY bars, so `<m>_sole` is also the counterfactual extra BUY signals
+    (signals, not trades — a signal during an open trade is not taken). Indicators are computed once: they are
+    causal, so slicing equals the backtest's per-window recompute (test_strategies.py)."""
+    ind = calculate_indicators(data)
+    c = {"bars": 0, "screen_fail": 0, "zero_volume": 0, "no_trend": 0, "mirror_bars": 0, "buy": 0}
+    c.update({f"{m}_{k}": 0 for m in MIRRORS for k in ("fail", "sole")})
+    for i in range(start_index, len(ind)):
+        window = ind.iloc[: i + 1]
+        c["bars"] += 1
+        if not passes_screener(window, cfg.screen)[0]:
+            c["screen_fail"] += 1
+            continue
+        ev = evaluate_4_mirrors(window, cfg.signal)
+        if ev["signal"] == "SKIPPED_ZERO_VOLUME":
+            c["zero_volume"] += 1
+            continue
+        if ev["signal"] == "NO_TREND":
+            c["no_trend"] += 1
+            continue
+        c["mirror_bars"] += 1
+        failed = [m for m in MIRRORS if not ev["mirrors"][m]]
+        c["buy"] += not failed
+        for m in failed:
+            c[f"{m}_fail"] += 1
+        if len(failed) == 1:
+            c[f"{failed[0]}_sole"] += 1
+    return c
+
+
+def mirror_rejection_table(counts: Mapping[str, int]) -> str:
+    """Markdown table of summed mirror_rejections() counts (percentages of bars that reached the mirrors)."""
+    n = max(counts["mirror_bars"], 1)
+    lines = [f"Bars evaluated: {counts['bars']:,} | screener fail {counts['screen_fail']:,} | Volume 0 "
+             f"{counts['zero_volume']:,} | ADX below min {counts['no_trend']:,} | reached the 4 mirrors "
+             f"{counts['mirror_bars']:,} | BUY {counts['buy']:,}", "",
+             "| Mirror | Failed (% of mirror bars) | Sole blocker (% of mirror bars) | Extra BUY signals if removed |",
+             "|---|---|---|---|"]
+    for m in MIRRORS:
+        f, s = counts[f"{m}_fail"], counts[f"{m}_sole"]
+        lines.append(f"| {m} | {f:,} ({f / n:.1%}) | {s:,} ({s / n:.1%}) | +{s:,} |")
+    return "\n".join(lines)
+
+
 def main() -> None:
     args = _parse_args()
     screen_cfg = ScreenConfig()
@@ -872,20 +922,26 @@ def main() -> None:
         signals.to_csv(args.out, index=False, encoding="utf-8-sig")
 
     if args.backtest:
-        breaks_log = []
+        breaks_log, rejections = [], {}
         for ticker, data in data_map.items():
-            stats = backtest(with_dividends(ticker, data) if dividend_mode == "add" else data, system_cfg)
+            frame = with_dividends(ticker, data) if dividend_mode == "add" else data
+            stats = backtest(frame, system_cfg)
             print(f"\nBacktest {ticker}")
             for key, value in stats.items():
                 print(f"{key}: {value}")
             if not stats["data_break_trades"].empty:
                 breaks_log.append(stats["data_break_trades"].assign(Ticker=ticker))
+            rejections[ticker] = mirror_rejections(frame, system_cfg)
         log_path = Path(__file__).with_name("outputs") / "data_breaks_log.csv"  # trades cancelled by a data break
         log_path.parent.mkdir(exist_ok=True)
         (pd.concat(breaks_log, ignore_index=True) if breaks_log else pd.DataFrame(
             columns=["Ticker", "Signal_Date", "Entry_Date", "Break_Date", "Entry", "Close_Before", "Close_At_Break"])
          ).to_csv(log_path, index=False)
         print(f"\nCancelled by data breaks: {sum(len(b) for b in breaks_log)} → {log_path}")
+        per_ticker = pd.DataFrame(rejections).T.rename_axis("Ticker")
+        per_ticker.to_csv(log_path.with_name("mirror_rejections.csv"))
+        print("\n## Mirror rejections (measurement only)\n" + mirror_rejection_table(per_ticker.sum().to_dict())
+              + f"\nPer ticker: {log_path.with_name('mirror_rejections.csv')}")
 
     assert not signals.empty
 
