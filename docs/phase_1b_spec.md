@@ -19,7 +19,13 @@ Source of truth: docs/execution_policy.md.
 - Volume 0 rows never enter, exit, or update a trailing stop. A filler entry
   bar skips the trade, rather than deferring it silently.
 - Data breaks cancel affected trades under the existing policy.
-- Preserve existing end-of-window liquidation and cost conventions.
+- Preserve legacy end-of-window liquidation and cost conventions.
+- New-path terminal entry rule: after BUY and before policy evaluation, skip a
+  signal whose next-bar entry would be the final available bar (i+2 >= n).
+  Do not fail the run for this condition. The last-bar signal is not evaluated
+  because it has no next-bar entry. This requires at least one post-entry bar.
+  Legacy remains unchanged and may record END on its entry bar. This is an
+  explicit path divergence, not a claim of generic-vs-legacy identity.
 
 These are simulation assumptions, not proof of executable real-world fills.
 There is no universal next-bar Close rule for stop/target exits.
@@ -58,6 +64,14 @@ class ExitPolicy:
   a positive integer, not a boolean. Validate flags as booleans.
 - Call exit_policy once on the signal-bar prefix with i equal to the signal
   index. Freeze the returned intent before entry; provide no future rows.
+  Generic execution starts at row 0; strategies must return WAIT until their
+  own history/indicators are ready. Before calling exit_policy, the runner
+  requires a post-entry bar, a non-filler signal, finite positive signal ATR
+  and Volume_SMA20, and a finite positive next-bar Close. Ineligible BUYs are
+  skipped without policy evaluation; these checks cannot affect prior signals.
+  i is a zero-based iloc position, not an index label. The prefix starts at
+  original row 0, so i == len(data)-1 is also its relative position. Do not
+  pass rolling/shifted windows under this contract.
 - After the actual entry is known, the runner resolves levels using ATR at
   the SIGNAL bar, not the entry bar:
   stop_mult = 1.5 if policy.stop_atr_mult is None else policy.stop_atr_mult;

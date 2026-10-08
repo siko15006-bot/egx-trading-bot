@@ -222,19 +222,45 @@ this repo). `egx_lists.filter_universe` applies it everywhere: dashboard, scanne
 - Decision 2026-10-07: universe unchanged for now; widening is deferred until the personal ledger
   (`docs/personal_ledger_design.md`) shows which stocks Ahmed actually trades.
 
-## Phase 1b planned two-path debt (not wired yet)
+## Phase 1b two-path debt
 
-The proposed runner dispatches TrendMirrors by strategy type to build_trade_plan
+validation/runner.py dispatches TrendMirrors by strategy type to build_trade_plan
 (legacy-path), and other strategies to generate_signals + exit_policy (new-path).
 Both must use the engine's signal-bar ATR column and label results by path.
 See docs/phase_1b_spec.md, "Temporary two-path debt", for the full contract.
 
 Before wiring, freeze a full-trade legacy regression covering dates, prices,
 initial stop/target, shares, reason, costs/P&L and cancellations. Plan snapshots
-are not sufficient. test_plan_sizing.py contains an explicitly SKIPPED precondition;
-that skip must be replaced by substantive assertions before C is accepted.
+are not sufficient. test_plan_sizing.py::test_legacy_runner_trade_match now checks
+the real runner against a pre-C frozen completed-trade fingerprint and the
+original backtest, including initial levels, shares, P&L and cancellation.
 The debt is retired only when full-trade identity between both paths is proved
 on agreed fixtures. Model changes require a separate reviewed impact analysis.
+test_legacy_vs_new_path_trade_match remains SKIPPED for this debt-retirement
+condition; test_legacy_runner_trade_match is a separate regression test, not
+evidence of generic-vs-legacy identity.
 The shared position_size contract reads only RiskConfig.capital, risk_pct,
 max_position_pct and max_avg_volume_pct. Any future change to that dependency
 set must update its docstring and contract tests in the same change.
+
+simulate_trade's keyword-only allow_trailing flag defaults to True for legacy;
+the generic runner passes False. Full exit-decision extraction is deferred to
+Phase 2 and requires legacy trade regression. exit_on_signal/max_hold_bars
+currently raise NotImplementedError; no partial RunResult is returned.
+After BUY and before policy evaluation, the generic path skips a penultimate-bar
+signal if its entry would be the last available bar (i+2 >= len(data)); it
+does not fail the run. A signal on the last available bar is not evaluated.
+Legacy retains its existing END liquidation, potentially on the entry bar.
+This terminal behavior is an explicit additional path divergence, not parity.
+Curves are closed-trade, per-stock
+diagnostics, not mark-to-market or a shared portfolio. MC remains out of scope.
+
+New path raises ContractError on a non-positive resolved stop or non-finite
+resolved levels. One offending ticker aborts the entire run without returning
+partial results. This strict guard is intentional; legacy is unchanged and
+has no equivalent explicit stop-positivity check in build_trade_plan.
+Generic signals start at row 0. Policy evaluation follows runner readiness
+checks; strategies still own any additional warmup and must emit WAIT for it.
+The runner imports engine-private _require_ohlcv: deliberate coupling/debt.
+Promote it to a shared public validation helper when the engine API is reviewed;
+do not duplicate its validation in a wrapper solely to hide the private name.

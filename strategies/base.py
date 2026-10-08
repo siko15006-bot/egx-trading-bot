@@ -45,7 +45,13 @@ class BaseStrategy(ABC):
 
     @abstractmethod
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
-        """Series on data's index with BUY (1), WAIT (0) or EXIT (-1) per bar."""
+        """Series on data's index with BUY (1), WAIT (0) or EXIT (-1) per bar.
+
+        Generic execution starts at row 0, with no shared WARMUP constant.
+        Return WAIT until all strategy-specific indicators/history are ready.
+        The runner guards its ATR/Volume_SMA20 readiness, not every indicator
+        a strategy might use. Signal generation itself must accept short prefixes.
+        """
 
     @abstractmethod
     def get_params(self) -> dict[str, Any]:
@@ -56,9 +62,20 @@ class BaseStrategy(ABC):
         """Registry key."""
 
     def exit_policy(self, data: pd.DataFrame, i: int) -> ExitPolicy | None:
-        """Future runner hook on the signal prefix; None preserves the legacy path.
+        """Runner hook on the signal prefix; None is only valid for TrendMirrors.
+
+        data contains rows 0..i inclusive, starting at the original first row.
+        i is a zero-based iloc position, not a timestamp/index label; it is
+        both the original position and len(data)-1 in this unshifted prefix.
+        A rolling/shifted window must not be passed under this contract.
+
+        Called once per eligible BUY after terminal-entry, signal-filler and
+        finite positive ATR/Volume_SMA20/next-entry checks. Early/ineligible BUYs
+        are skipped without calling this hook. Any additional strategy-specific
+        warmup must be enforced by returning WAIT from generate_signals.
 
         Non-TrendMirrors strategies must override this before generic execution.
-        This hook is not wired into the current engine.
+        validation.runner calls this only for the generic path; build_trade_plan
+        and the legacy runner branch do not call it.
         """
         return None

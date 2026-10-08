@@ -510,10 +510,11 @@ def target_fill(data: pd.DataFrame, j: int, target: float) -> float:
 
 
 def simulate_trade(data: pd.DataFrame, i: int, stop0: float, target: float, atr: float,
-                   breaks: Optional[np.ndarray] = None) -> dict[str, Any]:
+                   breaks: Optional[np.ndarray] = None, *, allow_trailing: bool = True) -> dict[str, Any]:
     """One long trade from a signal on bar i. The signal is only known after bar i closes, so the entry is the close of
     bar i+1; exits are checked from bar i+2. status: pending (no bar i+1 yet), skipped (entry bar invalid),
-    cancelled (a data break while open: outcome unknown, excluded from results), open, closed."""
+    cancelled (a data break while open: outcome unknown, excluded from results), open, closed.
+    allow_trailing=False disables stop movement only; all execution rules remain shared."""
     breaks = data_breaks(data) if breaks is None else breaks
     e = i + 1
     if e >= len(data):
@@ -534,9 +535,9 @@ def simulate_trade(data: pd.DataFrame, i: int, stop0: float, target: float, atr:
         if bar["High"] >= target:
             return {"status": "closed", "entry_index": e, "entry": entry, "exit_index": j,
                     "exit": target_fill(data, j, target), "reason": "TP", "stop": stop}
-        if bar["Close"] >= entry + 2 * atr:
+        if allow_trailing and bar["Close"] >= entry + 2 * atr:
             stop = max(stop, entry + atr)
-        elif bar["Close"] >= entry + atr:
+        elif allow_trailing and bar["Close"] >= entry + atr:
             stop = max(stop, entry)
     return {"status": "open", "entry_index": e, "entry": entry, "exit_index": len(data) - 1,
             "exit": float(data["Close"].iloc[-1]), "reason": "END", "stop": stop}
