@@ -5,6 +5,7 @@
 | Status | Item | Section |
 |---|---|---|
 | 🔴 Open | Entry price mismatch: live scanner shows Close[i] (unattainable), backtest assumes Close[i+1] — documented, not fixed (strategy on hold) | Execution conventions |
+| 🔴 Open | Test fixtures: daily `pd.date_range(..., tz=Africa/Cairo)` at midnight crashes on 2026-04-24 (nonexistent time) — fixtures use noon or start after April | Data health fails on Cairo DST… |
 | 🔴 Open | Data health crashes on the Cairo DST spring-forward midnight (only matters for a Friday session / intraday data) | Data health fails on Cairo DST… |
 | 🔴 Open | Yahoo misses whole EGX sessions for stocks (e.g. 2026-06-22, 08-10, 10-06); ~2–4.5%/yr lower bound | Missing EGX sessions in Yahoo |
 | 🔴 Open | Yahoo misdates/omits split adjustments in `data/` (HDBK, EFID, INFI, …) — guarded by `DATA_BREAK`, not corrected | Execution conventions |
@@ -33,6 +34,14 @@ Daily (midnight) rows: only the April spring-forward breaks. Hourly data: expose
 - Fix when needed: `tz_localize(CAIRO, nonexistent="shift_forward", ambiguous="NaT")` or localize dates
   as plain `date` objects instead of midnight timestamps.
 - Found 2026-10-05 while writing `test_download_freshness.py` (fixture now uses the Sun-Thu EGX week).
+- **Test infrastructure (separate issue, 2026-10-08):** any synthetic fixture built with a daily
+  `pd.date_range(start, periods=n, tz="Africa/Cairo")` at midnight that spans 2026-04-24 raises
+  `ValueError: 2026-04-24 00:00:00 is a nonexistent time` — before the code under test even runs, so the failure
+  looks unrelated to the change being tested. Hit twice on 2026-10-08 (`test_execution.py`, Volume 0 and Open tests),
+  worked around with a noon start (`"2026-01-04 12:00"`). `test_execution._flat()` and `_bars()` start in January /
+  September with ≤ 70 bars, so they do not reach April today; a longer `_flat(n)` would. Fix when convenient: one
+  shared fixture helper that always builds noon timestamps (or naive dates + `tz_localize(..., nonexistent=
+  "shift_forward")`).
 
 ## Yahoo filler rows (zero-volume flat bars) — provider gap, not market behaviour
 
