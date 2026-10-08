@@ -358,6 +358,73 @@ def import_file(path: Path, db_path: Path | None = None, *, accept: tuple[str, .
     return iid
 
 
+MANUAL_PREFIX = "manual://"
+
+
+def import_manual(path: Path, db_path: Path | None = None) -> int:
+    """Rows Ahmed confirmed outside a statement (e.g. from Thndr app screenshots), from a JSON file
+    {"source": "manual://...", "fills": [{date, ticker, side, qty, price}], "cash": [{date, kind, ticker, amount}]}.
+    The source is the import's file_name (manual://… vs a statement file name) — filter with
+    `JOIN imports ON imports.id = fills.import_id WHERE file_name LIKE 'manual://%'`. Screenshots show no fees, so
+    total_fees is the fees_config estimate, marked `fees_source: estimated` in raw_rows. No balance chain (no statement
+    balances); the same file can never be imported twice (sha256)."""
+    from contextlib import closing
+
+    from personal_journal import db as ledger_db
+
+    path = Path(path)
+    spec = json.loads(path.read_text(encoding="utf-8"))
+    source = spec["source"]
+    if not source.startswith(MANUAL_PREFIX):
+        raise ValueError(f"{path.name}: source must start with {MANUAL_PREFIX!r}")
+    known = set(_names().values())
+    rows: list[dict[str, Any]] = []
+    for f in spec.get("fills", []):
+        qty, price = int(f["qty"]), Decimal(str(f["price"]))
+        if f["side"] not in ("BUY", "SELL") or qty <= 0 or price <= 0 or f["ticker"] not in known:
+            raise ValueError(f"{path.name}: invalid fill {f}")
+        gross = (qty * price).quantize(CENT)
+        rows.append({"event_type": "fill", "trade_date": date_iso(f["date"]), "ticker": f["ticker"], "side": f["side"],
+                     "qty": qty, "price": price, "gross_value": gross, "total_fees": expected_fees(gross)["full"],
+                     "fees_source": "estimated: fees_config (not shown in the screenshot)", "source": source})
+    for c in spec.get("cash", []):
+        rows.append({"event_type": "cash", "trade_date": date_iso(c["date"]), "kind": c["kind"],
+                     "ticker": c.get("ticker"), "amount": Decimal(str(c["amount"])), "source": source})
+    rows.sort(key=lambda r: r["trade_date"])
+    for n, r in enumerate(rows, 1):
+        r["row_no"] = n
+    problems = [p for p in validate_balance(rows) if p.split()[0] in BLOCKING]
+    if problems:
+        raise ValueError(f"{path.name}: not imported —\n" + "\n".join(problems))
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    db_path = ledger_db.init_db(db_path or ledger_db.DB_PATH)
+    with closing(sqlite3.connect(db_path)) as con:
+        if con.execute("SELECT id FROM imports WHERE sha256 = ?", (digest,)).fetchone():
+            raise ValueError(f"{path.name}: already imported (sha256)")
+        with con:
+            iid = con.execute("INSERT INTO imports (file_name, sha256, imported_at, period_from, period_to, row_count, "
+                              "account) VALUES (?, ?, ?, ?, ?, ?, 'main')",
+                              (source, digest, datetime.now().astimezone().isoformat(timespec="seconds"),
+                               rows[0]["trade_date"], rows[-1]["trade_date"], len(rows))).lastrowid
+            for r in rows:
+                con.execute("INSERT INTO raw_rows VALUES (?, ?, ?)", (iid, r["row_no"], json.dumps(
+                    {k: str(v) if isinstance(v, Decimal) else v for k, v in r.items()}, ensure_ascii=False)))
+                if r["event_type"] == "fill":
+                    con.execute("INSERT INTO fills (import_id, row_no, ts_cairo, ticker, side, qty, price, gross_value, "
+                                "total_fees) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                (iid, r["row_no"], r["trade_date"], r["ticker"], r["side"], r["qty"],
+                                 _db_float(r["price"]), _db_float(r["gross_value"]), _db_float(r["total_fees"])))
+                else:
+                    con.execute("INSERT INTO cash_events (import_id, row_no, ts_cairo, kind, ticker, amount) "
+                                "VALUES (?, ?, ?, ?, ?, ?)",
+                                (iid, r["row_no"], r["trade_date"], r["kind"], r.get("ticker"), _db_float(r["amount"])))
+    return iid
+
+
+def date_iso(text: str) -> str:
+    return datetime.strptime(text, "%Y-%m-%d").date().isoformat()   # strict: rejects 2026-4-1, 2026-13-01
+
+
 if __name__ == "__main__":
     import sys
 
