@@ -16,6 +16,7 @@ import argparse
 import hashlib
 import html
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -90,7 +91,10 @@ def scan(data_map: dict[str, pd.DataFrame], signal_cfg: eng.SignalConfig, risk_c
         data = eng.calculate_indicators(df)
         indicators[ticker] = data
         ok, _ = eng.passes_screener(data, screen_cfg)
-        result = classify(ticker, data, eng.evaluate_4_mirrors(data, signal_cfg), ok, signal_cfg, risk_cfg)
+        evaluation = eng.evaluate_4_mirrors(data, signal_cfg)
+        if evaluation["signal"] == "SKIPPED_ZERO_VOLUME":
+            logging.getLogger(__name__).warning("SKIPPED_ZERO_VOLUME %s: latest candle has Volume 0 (missing data)", ticker)
+        result = classify(ticker, data, evaluation, ok, signal_cfg, risk_cfg)
         if result:
             (buy if result[0] == "BUY" else watch).append(result[1])
     return pd.DataFrame(buy), pd.DataFrame(watch).sort_values("المسافة %") if watch else pd.DataFrame(), indicators

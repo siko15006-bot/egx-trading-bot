@@ -76,12 +76,21 @@ def assess_daily_data(
             else:
                 valid[ticker] = frame
                 fresh += 1
+    # SUSPECT_VOLUME (warning only, never blocks): Volume 0 rows are missing data — skipped by execution and left out of
+    # the indicators (calculate_indicators). Count per ticker; *_latest = the candle the scan would use is one of them.
+    zero = {t: int((pd.to_numeric(f["Volume"], errors="coerce") == 0).sum()) for t, f in valid.items()}
+    share = {t: zero[t] / len(f) * 100 for t, f in valid.items()}
+    buckets = {"0-5%": (0, 5), "5-15%": (5, 15), "15-30%": (15, 30), ">30%": (30, 101)}   # ponytail: no threshold yet
+    distribution = {k: sum(lo <= s < hi for s in share.values()) for k, (lo, hi) in buckets.items()}
     report = {
         "status": "DATA_OK" if required and not problems and fresh == len(data_map) else "DATA_UNAVAILABLE",
         "expected_session": target.isoformat(), "latest_session": max(latest, default=None),
         "oldest_session": min(latest, default=None), "loaded": len(data_map),
         "required": len(required), "fresh": fresh, "problems": problems,
         "calendar_policy": "Sun-Thu plus configured EGX_MARKET_HOLIDAYS; official holidays not guessed",
+        "suspect_volume": {t: n for t, n in sorted(zero.items()) if n},
+        "suspect_volume_latest": sorted(t for t, f in valid.items() if float(f["Volume"].iloc[-1]) == 0),
+        "suspect_volume_distribution": distribution,   # tickers per share of Volume 0 rows in their history
     }
     return valid, report
 

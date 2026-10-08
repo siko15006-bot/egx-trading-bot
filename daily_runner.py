@@ -223,6 +223,11 @@ def run_daily(args: argparse.Namespace) -> int:
         _write_health(health_path, health)
         LOGGER.info("Data health: status=%s expected=%s latest=%s fresh=%s/%s",
                     health["status"], health["expected_session"], health["latest_session"], health["fresh"], health["required"])
+        if health.get("suspect_volume"):
+            LOGGER.warning("SUSPECT_VOLUME: %d zero-volume rows in %d tickers (missing data, not signals); latest candle "
+                           "zero-volume: %s; tickers by share %s", sum(health["suspect_volume"].values()),
+                           len(health["suspect_volume"]), health["suspect_volume_latest"] or "none",
+                           health["suspect_volume_distribution"])
         if health["status"] != "DATA_OK":
             raise DataHealthError(health)
         if getattr(args, "health_only", False):

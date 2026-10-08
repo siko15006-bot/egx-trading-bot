@@ -13,7 +13,7 @@
 | ❓ Unknown | FUND_DOCUMENT_FEE: exchange-traded fund certificate (وثائق صندوق المصريين, 2026-09-07) charged +1.01 EGP above `fees_config`; cause unknown — ask Thndr support. Not corrected | Execution conventions → Fees |
 | ❓ Unknown | Slippage size on EGX (10 bps default is an assumption); trading halts / limit-locked days; official holiday calendar | Execution conventions; Missing EGX sessions |
 | ❓ Unknown | Effect of misdated splits on the H3 research result | Execution conventions |
-| ✅ Closed (rule in place) | Filler rows handled as missing data | Yahoo filler rows |
+| ✅ Closed (rule in place) | Volume 0 rows = missing data: no indicators (computed on real rows only), signal → SKIPPED_ZERO_VOLUME, no fills, data_health warns (2026-10-08) | Yahoo filler rows |
 | ✅ Closed (rule in place) | `data/` vs fully adjusted series never mixed; dividends only on `data/`, enforced by `resolve_dividend_mode` | Price series; Dividends in backtests |
 | ✅ Closed | No Open-based fills; entry at next close; in-range fills; optimizer selects on main window only (OOS = 9 large caps) | Execution conventions |
 | ✅ Closed (verdict) | 4 Mirrors strategy ABANDON vs Buy & Hold | Strategy vs Buy & Hold |
@@ -44,12 +44,20 @@ Rule adopted 2026-10-06. Raw CSVs stay untouched; this applies at analysis/backt
   08-10 was a confirmed session (EGX30 traded, EGP 14.9bn). So filler = Yahoo calendar gap, not "no trading".
 - The 4 "Open != prev Close" days (06-21, 06-23, 08-11, 08-17 — 353 of 379 mismatches) are the first
   real day after a filler run: prev Close is a filler value, not real.
-- Handling:
-  1. Filler rows are flagged and excluded from any OHLC-based calc; their return/PnL = NA, never 0.
-  2. The first real row after a filler gets `open_reference_unverified`: its `prev_close` = NA,
-     but its own Open stays usable.
-  3. No entries at a filler Open; no SL/TP or gap logic built on a filler prev_close.
-  4. Every performance report states the filler count and that metrics cover verifiable rows only.
+- Handling (corrected 2026-10-08 to match the code — the earlier list claimed exclusion from indicators that did not
+  exist; 137 of 309 backtest signals had a Volume 0 row inside their 20-bar window). Code rule: **Volume 0 = missing
+  data** (`is_filler`, Volume <= 0; on `data/` every such row is also flat):
+  1. **Indicators** (`calculate_indicators`): computed on the Volume > 0 rows only and joined back — the row keeps
+     its place and raw OHLCV, its indicators are NaN, and every other row equals the series without it (windows
+     slide one bar further back). NaN-masking the prices instead was measured and rejected: `_clean_ohlcv` drops NaN
+     rows, NaN + `rolling(min_periods=1)` differs from that reference on 81/220 COMI rows, EMA with NaN on 125.
+  2. **Signals** (`evaluate_4_mirrors`): a Volume 0 latest candle → `SKIPPED_ZERO_VOLUME` (rejected, logged by the
+     daily scan and `signal_engine`).
+  3. **Execution**: never an entry, exit or trailing-stop update (`docs/execution_policy.md`); counts as an elapsed
+     session for data breaks. Open is not used anywhere in execution.
+  4. **data_health**: `suspect_volume` (rows per ticker), `suspect_volume_latest`, `suspect_volume_distribution`
+     (tickers per share: 0-5 / 5-15 / 15-30 / >30%) — a warning in the report and log, never a block; no threshold yet.
+  5. Every performance report should state the Volume 0 count (verifiable rows only).
 - Deferred: re-checking prices via Investing.com (doesn't change handling); alternative provider
   (decide once filler share over 2019-2026 is measured).
 
@@ -142,6 +150,9 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
   cancelled (EXPA, INFI → `outputs/data_breaks_log.csv`); before this policy 315 trades, +66,910.
   2026-10-08, gaps at Close (never Open): 309 trades, **+68,746 EGP**, 2 cancelled, 7 gap exits (1 changed: MPCI
   2026-08-10 target gap, Open 393.72 → Close 402.00, +335). Still beats B&H in 12/90 stocks → ABANDON stands.
+  2026-10-08, indicators from Volume > 0 rows only: **287 trades, +69,041 EGP**, 1 cancelled; only 89 trades
+  identical (83 removed — 20 by the volume mirror, 21 ADX, 14 trend/momentum, 28 sequence shift; 61 added; 137 with
+  a different size or exit through ATR). Still 12/90 above B&H → ABANDON stands.
   Correction: the 2026-10-06 note that EFID's split is "already inside data/" was wrong — the comparison used two
   Yahoo series with the same misdating.
 - **Slippage:** `RiskConfig.slippage_bps` (default 10, an assumption — no fill data yet), applied per side in
