@@ -221,3 +221,20 @@ this repo). `egx_lists.filter_universe` applies it everywhere: dashboard, scanne
   Yahoo rows where Close is stuck at 156.92 while High/Low move (Yahoo did not update Close in late 2024).
 - Decision 2026-10-07: universe unchanged for now; widening is deferred until the personal ledger
   (`docs/personal_ledger_design.md`) shows which stocks Ahmed actually trades.
+
+## Phase 1b planned two-path debt (not wired yet)
+
+The proposed runner dispatches TrendMirrors by strategy type to build_trade_plan
+(legacy-path), and other strategies to generate_signals + exit_policy (new-path).
+Both must use the engine's signal-bar ATR column and label results by path.
+See docs/phase_1b_spec.md, "Temporary two-path debt", for the full contract.
+
+Before wiring, freeze a full-trade legacy regression covering dates, prices,
+initial stop/target, shares, reason, costs/P&L and cancellations. Plan snapshots
+are not sufficient. test_plan_sizing.py contains an explicitly SKIPPED precondition;
+that skip must be replaced by substantive assertions before C is accepted.
+The debt is retired only when full-trade identity between both paths is proved
+on agreed fixtures. Model changes require a separate reviewed impact analysis.
+The shared position_size contract reads only RiskConfig.capital, risk_pct,
+max_position_pct and max_avg_volume_pct. Any future change to that dependency
+set must update its docstring and contract tests in the same change.

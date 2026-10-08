@@ -84,6 +84,26 @@ class ExitPolicy:
 Acceptance test for compatibility: run(TrendMirrors) must reproduce backtest()
 trade for trade, including prices, timing, cancellation and costs.
 
+### Temporary two-path debt (runner wiring not implemented)
+
+- Planned dispatch is explicit by strategy type: TrendMirrors uses
+  build_trade_plan (legacy-path); other BaseStrategy implementations use
+  generate_signals plus exit_policy (new-path). The runner retains the strategy
+  instance. None from an unrelated strategy must not trigger the legacy path.
+- Tag every result and trade with legacy-path or new-path; never silently mix
+  execution paths in reported results.
+- Both paths use the engine's ATR column at the signal bar: Wilder 14 True
+  Range on Volume > 0 rows, not an alternative ATR implementation.
+- Extract sizing before wiring, as a separate pre-Phase-1b refactor. Preserve
+  the legacy entry reference, arithmetic, rounding and fee-adjusted target.
+- Before wiring, add a frozen full-trade regression for legacy TrendMirrors:
+  entry/exit dates and prices, initial stop/target, shares, exit reason,
+  costs/P&L and cancellations. Existing signal-identity tests alone do not
+  satisfy this requirement. Plan snapshots are not completed-trade regression.
+- Retire this debt only after both paths pass full-trade identity tests on
+  the agreed fixtures. Any deliberate model change requires separate review
+  and impact analysis, not updated expected values presented as identity.
+
 ## Decision 2: Monte Carlo denominator FROZEN, gate DISABLED
 
 Frozen before any run:
