@@ -84,35 +84,64 @@ class ExitPolicy:
 Acceptance test for compatibility: run(TrendMirrors) must reproduce backtest()
 trade for trade, including prices, timing, cancellation and costs.
 
-## Decision 2: approximate Monte Carlo, not portfolio simulation
+## Decision 2: Monte Carlo denominator FROZEN, gate DISABLED
+
+Frozen before any run:
+
+    N_SLOTS = 10
+    PER_TRADE_CAPITAL = 100,000 EGP
+    NOTIONAL_DENOMINATOR = N_SLOTS * PER_TRADE_CAPITAL = 1,000,000 EGP
+
+This is a notional risk yardstick, not capital actually deployed or a portfolio
+simulation. Observed max concurrency is not the denominator: a larger
+denominator would shrink DD% for the same EGP loss. No post-hoc change to the
+denominator or switch between max and p95 is permitted.
 
 - N=1000 i.i.d. bootstrap resamples of eligible OOS trades, with replacement.
-- Seed and initial capital denominator must be fixed and recorded before a run.
-- Accumulate fixed net trade P/L to produce an approximate closed-trade
-  equity curve; not mark-to-market.
-- This ignores capital constraints, overlapping positions, changing sizing,
-  intratrade mark-to-market and dependence across trades. It is NOT shared-account
-  or portfolio-level drawdown, and does not establish live account risk.
-- Report median and 95th-percentile maximum drawdown, baseline approximate DD,
-  their ratio, initial capital denominator and worst single-stock DD separately.
-  Ratio is NOT_AVAILABLE if baseline DD is zero.
-- Provisional approximate gate: 95th-percentile DD <= 15%. Gate status:
-  DISABLED until the capital denominator is decided and frozen. Do not choose the
-  denominator or revise the threshold after seeing results.
-- Proper shared-account MC requires re-simulating capital-constrained execution
-  and position overlap; it is outside this approximation's scope.
-- An approximate pass is not evidence that account drawdown is below 15%.
+- Freeze and record the seed before running; never select it from results.
+- Accumulate fixed net trade P/L into an approximate closed-trade equity curve,
+  not mark-to-market. Include the initial point before the first trade.
+- Define max DD in EGP as the largest running-peak minus subsequent cumulative
+  P/L. Report DD_fraction = max_DD_EGP / NOTIONAL_DENOMINATOR. This is fixed-
+  denominator drawdown, not conventional percentage drawdown from a varying peak.
+- This ignores capital constraints, position overlap, changing sizing,
+  intratrade mark-to-market and dependence. It is NOT shared-account simulation.
+- Report median and p95 max DD, baseline non-resampled DD on the same denominator,
+  p95/baseline ratio (NOT_AVAILABLE if baseline DD is zero), and worst-stock DD.
+- Report the baseline concurrency histogram and median/p95/max open positions;
+  freeze observation-grid and same-day overlap conventions before measurement.
+  Concurrency is informational, not resampled and not used in the denominator.
+
+Gate: p95 max DD <= 15% of NOTIONAL_DENOMINATOR. Status: DISABLED until this
+data-source decision is committed, a baseline on data_2019_2026_wf/ is produced
+for a sanity check, and a separate explicit gate-enablement decision is recorded.
+Do not enable the gate from this spec alone. A non-binding baseline gate is
+reported as such, not repaired by tuning the denominator after results.
+
+Capacity Violation is a separate boolean: did baseline concurrency exceed
+N_SLOTS? It neither implies nor is implied by a DD breach. No capacity ranking,
+re-entry or rejection rule is defined here. Realistically enforcing capacity
+requires a runner change, outside this Phase 1b approximation.
 
 Buy & hold is reported, not an acceptance gate. Use only benchmarks actually
 present in the inputs; name the dataset and dividend/cost conventions.
 
-## Decision 3: longer data, explicit dividend mode
+## Decision 3: data source FROZEN
 
-- Preferred candidate: longer history in data_extended/, leaving data/ untouched.
-- Fallback candidate: data_2019_2026_wf/ on 10 stocks, explicitly labelled
-  small-universe. Dataset selection is NOT FINALIZED; data_extended/ is not
-  declared ready or usable by this spec.
-- Verify at least one falling and one choppy regime before robustness claims.
+- Dataset: data_2019_2026_wf/, 9 stocks. Eight begin 2019-07-02;
+  EFIH begins 2021-10-20. All end 2026-10-01.
+- Regime verification is DEFERRED. No falling/choppy classifier is applied
+  or frozen for Phase 1b. Individual-stock drawdowns do not prove regime coverage.
+- Every result carries: small-universe, partial-history, regimes-unverified.
+- Acceptance is explicitly RELAXED from regime-diverse validation to validation
+  on a small, partially-covered, regime-unverified dataset. Every results file
+  states this relaxation; a pass does NOT establish multi-regime robustness.
+- data/ remains rising-market-only smoke testing, ineligible for acceptance.
+- data_extended/ is unavailable and not planned for this Phase 1b scope.
+- EFIH enters no earlier than 2021-10-20. Cross-sectional counts use stocks
+  with available eligible history at the evaluation date/window; report the
+  actual denominator, including exclusions for insufficient warm-up/history.
+  Never synthesize pre-listing history to make the universe constant.
 - Dividend semantics verified against resolve_dividend_mode and its caller:
   add -> dividend-unadjusted prices; with_dividends is applied.
   none -> dividend-adjusted prices; no dividends added.
@@ -121,9 +150,10 @@ present in the inputs; name the dataset and dividend/cost conventions.
   the unknown-folder run is refused.
 - Registration is recommended, not mandatory. Verify adjustment status from
   provenance before choosing a mode; never infer it from a folder name.
-- Every result records dataset path, fingerprints, adjustment mode and regime
-  labels. One-year data/ is rising-market-only smoke testing and cannot pass
-  regime-diverse acceptance.
+- Declare the chosen folder's dividend mode explicitly and record it per run.
+- Fingerprint the actual data, code and configuration inputs per run, with
+  paths and counts. The old report's 96-input count is not a fixed requirement
+  for this different dataset.
 
 ## Actual engine interface and net/gross runs
 
@@ -156,8 +186,9 @@ running. OOS windows do not overlap; training parameters never see test data.
    T=sum(net PnL across eligible windows); remove the window with the largest
    total net P/L and require T_best>0. Fewer than two eligible windows is
    insufficient. Report all excluded windows and their results as well.
-4. Apply the provisional approximate MC gate only with a pre-frozen capital
-   denominator, and retain its limitations in every pass/fail statement.
+4. The approximate MC gate remains DISABLED pending baseline sanity review
+   and explicit enablement. Report it as not evaluated, not a pass. No complete
+   acceptance pass can be declared while a required gate is disabled.
 5. No look-ahead; apply the existing touch/gap policy above, not universal
    next-bar Close exits. Changing only Open must not change fills.
 6. Report independent net and gross results, per window and overall.
@@ -180,9 +211,10 @@ No deleted-trade arithmetic may be presented as a backtest counterfactual.
 - Amend PHASE_1B_PLAN.md with a pointer in a later approved documentation edit.
 - Implementation: not started. No code, defaults, data or execution policy changed.
 - Exit signature and multiplier payload: frozen in this design, not implemented.
-- Implementation remains BLOCKED until the MC capital denominator and actual
-  dataset choice are settled. Record an explicit verified
-  dividend mode for the chosen dataset; registry membership is not mandatory.
+- Dataset choice and notional denominator: frozen; MC gate remains DISABLED.
+- Implementation and baseline execution are not authorized by this documentation
+  commit. Record an explicit verified dividend mode; registry membership is optional.
 - Before implementation: freeze scheduled-exit edge cases and generic sizing.
-- Before acceptance runs: verify longer data and dividend mode, freeze windows,
-  regime definitions, bootstrap seed and capital denominator.
+- Before baseline/acceptance runs: verify dividend mode, freeze windows,
+  bootstrap seed and concurrency measurement conventions. Regime verification
+  is deferred with the explicit acceptance relaxation above.
