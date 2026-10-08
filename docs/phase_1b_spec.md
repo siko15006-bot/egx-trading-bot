@@ -33,38 +33,44 @@ causal scheduling rule; the bar-count convention must also be frozen.
 
 ## Decision 1: extend BaseStrategy, no parallel Protocol
 
-Optional exit_policy method: signature NOT FINALIZED and not implemented.
-The open choice is whether the strategy receives entry_price/entry_index as
-arguments or the runner resolves entry context from its execution record.
-Neither interface is frozen by this spec. Proposed policy payload:
+Exit interface: FROZEN as a design decision; not implemented.
+The strategy owns exit intent; the runner owns actual entry and execution.
+The strategy does not receive entry_price or entry_index. Contract:
 
 ```python
+def exit_policy(self, data, i) -> ExitPolicy | None:
+    return None
+
 @dataclass(frozen=True)
 class ExitPolicy:
-    use_generic_defaults: bool = False
-    stop: float | None = None
-    target: float | None = None
+    stop_atr_mult: float | None = None
+    target_atr_mult: float | None = None
     exit_on_signal: bool = False
     max_hold_bars: int | None = None
 ```
 
-- `stop` and `target` are absolute prices, not overloaded multipliers.
-- `use_generic_defaults=True` rejects any explicit stop or target in
-  `__post_init__`; do not silently choose one interpretation.
-- Require finite positive explicit levels and a positive integer max_hold_bars
-  when supplied. Reject contradictory long-position levels.
-- None requests the legacy TrendMirrors plan only. Non-TrendMirrors strategies
-  must return a policy with an explicit stop or use_generic_defaults=True.
-- The runner resolves generic defaults using the realized entry price and
-  ATR at the SIGNAL bar, not the entry bar:
-  stop = entry_price - 1.5 * ATR(signal_bar);
-  target = entry_price + 3.0 * ATR(signal_bar).
+- Field-level None means the generic default multiplier, not no stop/target.
+  ExitPolicy() therefore requests both generic defaults; no flag or sentinel.
+- Returning None for the whole policy is distinct: it requests the legacy
+  TrendMirrors plan only. Non-TrendMirrors strategies must return ExitPolicy.
+- Validate supplied multipliers as finite and strictly positive; reject zero,
+  negatives, NaN, infinity and booleans. max_hold_bars, when supplied, must be
+  a positive integer, not a boolean. Validate flags as booleans.
+- Call exit_policy once on the signal-bar prefix with i equal to the signal
+  index. Freeze the returned intent before entry; provide no future rows.
+- After the actual entry is known, the runner resolves levels using ATR at
+  the SIGNAL bar, not the entry bar:
+  stop_mult = 1.5 if policy.stop_atr_mult is None else policy.stop_atr_mult;
+  target_mult = 3.0 if policy.target_atr_mult is None else policy.target_atr_mult;
+  stop = entry_price - stop_mult * ATR(signal_bar);
+  target = entry_price + target_mult * ATR(signal_bar).
+  Use explicit None checks, not `value or default`. Refuse invalid signal ATR
+  or nonpositive resolved stop; do not silently clip levels.
 - Frozen runner constants: GENERIC_DEFAULT_STOP_ATR_MULT=1.5 and
   GENERIC_DEFAULT_TARGET_ATR_MULT=3.0. Strategies need no custom sentinel.
-- The eventual interface must allow policy resolution after the entry Close
-  is known. Resolution must not affect
-  the earlier BUY decision or use entry-bar High/Low to trigger an exit.
-  Pass only a prefix ending at the evaluation bar; no future rows.
+- Entry-based level resolution must not affect the earlier BUY decision or
+  use entry-bar High/Low to trigger an exit. Absolute/non-ATR stops and a
+  no-stop mode are outside Phase 1b; extend the contract only when needed.
 - Resolve fixed levels once at entry; evaluate later exit signals separately.
   `exit_on_signal` enables use of the existing EXIT signal stream, it is not
   itself an immediate exit instruction.
@@ -173,8 +179,9 @@ No deleted-trade arithmetic may be presented as a backtest counterfactual.
   cost models, with code/config/data provenance.
 - Amend PHASE_1B_PLAN.md with a pointer in a later approved documentation edit.
 - Implementation: not started. No code, defaults, data or execution policy changed.
-- Implementation is BLOCKED until the MC capital denominator, exit_policy
-  signature and actual dataset choice are settled. Record an explicit verified
+- Exit signature and multiplier payload: frozen in this design, not implemented.
+- Implementation remains BLOCKED until the MC capital denominator and actual
+  dataset choice are settled. Record an explicit verified
   dividend mode for the chosen dataset; registry membership is not mandatory.
 - Before implementation: freeze scheduled-exit edge cases and generic sizing.
 - Before acceptance runs: verify longer data and dividend mode, freeze windows,
