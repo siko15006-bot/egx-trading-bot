@@ -330,6 +330,20 @@ def _net_reward_risk(
     return net_loss, net_profit, rr_net
 
 
+def position_size(entry: float, risk_per_share: float, avg_volume: float,
+                  risk_cfg: RiskConfig) -> int:
+    """Shared sizing math; requires positive finite entry and risk_per_share.
+
+    Reads only capital, risk_pct, max_position_pct and max_avg_volume_pct from
+    risk_cfg. Returns the integer minimum of the three floored limits, including
+    zero. Caller validates inputs and decides whether to skip nonpositive size.
+    """
+    shares_by_risk = floor((risk_cfg.capital * risk_cfg.risk_pct) / risk_per_share)
+    shares_by_cap = floor((risk_cfg.capital * risk_cfg.max_position_pct) / entry)
+    shares_by_liq = floor(risk_cfg.max_avg_volume_pct * avg_volume)
+    return int(min(shares_by_risk, shares_by_cap, shares_by_liq))
+
+
 def build_trade_plan(
     ticker: str,
     df: pd.DataFrame,
@@ -350,10 +364,7 @@ def build_trade_plan(
     if not np.isfinite(risk_per_share) or risk_per_share <= 0:
         return None
 
-    shares_by_risk = floor((risk_cfg.capital * risk_cfg.risk_pct) / risk_per_share)
-    shares_by_cap = floor((risk_cfg.capital * risk_cfg.max_position_pct) / entry)
-    shares_by_liq = floor(risk_cfg.max_avg_volume_pct * float(last["Volume_SMA20"]))
-    shares = int(min(shares_by_risk, shares_by_cap, shares_by_liq))
+    shares = position_size(entry, risk_per_share, float(last["Volume_SMA20"]), risk_cfg)
     if shares <= 0:
         return None
 
