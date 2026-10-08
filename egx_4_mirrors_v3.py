@@ -3,6 +3,7 @@ from egx_lists import filter_universe, annotate, SECTOR_MAP as UNIVERSE_SECTORS
 from fees_config import FeesConfig, THNDR_FEES, order_fees, round_trip_fees
 
 import argparse
+import logging
 from dataclasses import dataclass
 from math import floor, sqrt
 from pathlib import Path
@@ -150,7 +151,22 @@ def _wilder(series: pd.Series, period: int = 14) -> pd.Series:
 
 
 def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """Indicators from real bars only (Ahmed 2026-10-08): a Volume 0 row is missing data, not a flat session. Every
+    indicator is computed on the Volume > 0 rows and joined back, so filler rows keep their place and raw OHLCV (for
+    execution, which skips them via is_filler) but carry NaN indicators — and never shift a rolling window or EMA.
+    (NaN-ing the prices instead would drop the rows in _clean_ohlcv and blank 20-bar windows after every filler.)"""
     data = _clean_ohlcv(df)
+    real = data["Volume"] > 0
+    if real.all():
+        return _indicators(data)
+    ind = _indicators(data[real])
+    out = data.join(ind[[c for c in ind.columns if c not in data.columns]])
+    out.attrs = ind.attrs
+    return out
+
+
+def _indicators(data: pd.DataFrame) -> pd.DataFrame:
+    data = data.copy()
     close = data["Close"]
     high = data["High"]
     low = data["Low"]
@@ -271,6 +287,8 @@ def evaluate_4_mirrors(df: pd.DataFrame, signal_cfg: SignalConfig) -> dict[str, 
         "Volatility": False,
     }
 
+    if float(last["Volume"]) <= 0:   # Ahmed 2026-10-08: missing data, its indicators are NaN → rejected, not deferred
+        return {"signal": "SKIPPED_ZERO_VOLUME", "mirrors": mirrors, "row": last}
     if abs(float(last.get("Gap_Pct", 0) or 0)) > signal_cfg.max_gap_pct:
         return {"signal": "SKIP_GAP", "mirrors": mirrors, "row": last}
     if float(last["ADX"]) < signal_cfg.min_adx:
@@ -720,6 +738,8 @@ def scan_universe(
             continue
 
         evaluation = evaluate_4_mirrors(data, signal_cfg)
+        if evaluation["signal"] == "SKIPPED_ZERO_VOLUME":
+            logging.getLogger(__name__).warning("SKIPPED_ZERO_VOLUME %s: latest candle has Volume 0 (missing data)", ticker)
         plan = build_trade_plan(ticker, data, signal_cfg, risk_cfg)
         if plan is None:
             rows.append(

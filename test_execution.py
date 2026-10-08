@@ -174,3 +174,40 @@ def test_optimizer_cli_rejects_bad_slippage() -> None:  # missing tests 9–10: 
                              (["--slippage-bps", "nan"], 1, "slippage_bps"), (["--bogus"], 2, "unrecognized")):
         p = subprocess.run([sys.executable, "backtest_optimizer.py", *argv], cwd=here, capture_output=True, text=True, timeout=120)
         assert p.returncode == code and text in p.stderr and "IndexError" not in p.stderr, (argv, p.returncode, p.stderr[-300:])
+
+
+def test_data_with_zero_volume_row_equals_data_without_it() -> None:  # Ahmed 2026-10-08: Volume 0 = missing data
+    # the windows slide past the missing row (a 20-bar average reaches one bar further back), so every real row must
+    # match the reference series that never had the row
+    rng = np.random.default_rng(3)
+    idx = pd.date_range("2026-01-04 12:00", periods=120, freq="2D", tz=eng.CAIRO_TZ).tz_convert("UTC")  # noon: no DST gap
+    close = 100 * np.exp(np.cumsum(rng.normal(0, 0.02, 120)))
+    base = pd.DataFrame({"Open": close, "High": close * 1.01, "Low": close * 0.99, "Close": close,
+                         "Volume": rng.integers(1_000, 9_000, 120).astype(float)}, index=idx)
+    gap = idx[60] + pd.Timedelta(days=1)
+    filler = pd.DataFrame({"Open": 55.0, "High": 55.0, "Low": 55.0, "Close": 55.0, "Volume": 0.0}, index=[gap])
+    with_filler = pd.concat([base, filler]).sort_index()
+    a, b = eng.calculate_indicators(base), eng.calculate_indicators(with_filler)
+    assert len(b) == 121                                          # the row stays in place (not deleted) ...
+    assert b.loc[gap, ["Open", "Close", "Volume"]].tolist() == [55.0, 55.0, 0.0]   # ... with its raw OHLCV for execution
+    ind_cols = [c for c in a.columns if c not in base.columns]
+    assert b.loc[gap, ind_cols].isna().all()                      # and no indicator of its own
+    pd.testing.assert_frame_equal(b.drop(index=gap)[a.columns], a)   # every other row: identical to the series without it
+
+
+def test_data_health_reports_zero_volume_as_warning_only() -> None:
+    from data_health import assess_daily_data
+    frame = _flat(70).tz_convert(eng.CAIRO_TZ)
+    frame.iloc[30, frame.columns.get_loc("Volume")] = 0
+    last = frame.index[-1].date()
+    valid, report = assess_daily_data({"T.CA": frame}, expected=last, min_rows=60)
+    assert report["status"] == "DATA_OK" and "T.CA" in valid      # a warning, not a block
+    assert report["suspect_volume"] == {"T.CA": 1} and report["suspect_volume_latest"] == []
+    assert report["suspect_volume_distribution"] == {"0-5%": 1, "5-15%": 0, "15-30%": 0, ">30%": 0}   # 1 of 70 rows
+
+
+def test_signal_on_zero_volume_candle_is_rejected() -> None:
+    d = _flat(70)
+    d.iloc[-1, d.columns.get_loc("Volume")] = 0
+    assert eng.evaluate_4_mirrors(eng.calculate_indicators(d), eng.SignalConfig())["signal"] == "SKIPPED_ZERO_VOLUME"
+    assert eng.evaluate_4_mirrors(eng.calculate_indicators(_flat(70)), eng.SignalConfig())["signal"] != "SKIPPED_ZERO_VOLUME"
