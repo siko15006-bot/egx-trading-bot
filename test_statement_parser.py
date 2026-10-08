@@ -187,3 +187,32 @@ def test_chain_break_blocks(tmp_path) -> None:
                     "opening_balance, closing_balance) VALUES ('fake', 'h', 't', '2026-07-01', '2026-07-31', 0, 'main', 0, 1)")
     with pytest.raises(ValueError, match="CHAIN_BREAK"):
         st.import_file(REAL_AUG, db, accept=("OVERSELL",))
+
+
+def test_manual_rows_are_tagged_and_guarded(tmp_path) -> None:
+    import json
+    spec = {"source": "manual://screenshot_test", "fills": [
+                {"date": "2026-05-13", "ticker": "COMI.CA", "side": "BUY", "qty": 10, "price": "100.00"},
+                {"date": "2026-05-20", "ticker": "COMI.CA", "side": "SELL", "qty": 10, "price": "110.00"}],
+            "cash": [{"date": "2026-05-15", "kind": "dividend", "ticker": "COMI.CA", "amount": "5.00"}]}
+    f = tmp_path / "m.json"
+    f.write_text(json.dumps(spec), encoding="utf-8")
+    db = tmp_path / "ledger.db"
+    iid = st.import_manual(f, db)
+    with sqlite3.connect(db) as con:
+        assert con.execute("SELECT file_name, account, row_count FROM imports WHERE id=?", (iid,)).fetchone() == \
+            ("manual://screenshot_test", "main", 3)
+        fills = con.execute("SELECT f.side, f.total_fees FROM fills f JOIN imports i ON i.id = f.import_id "
+                            "WHERE i.file_name LIKE 'manual://%' ORDER BY f.row_no").fetchall()
+        assert fills == [("BUY", 4.75), ("SELL", 4.93)]   # estimate: 1,000 → 4.75; 1,100 → 3.10+.11+.11+1+.06+.55
+        assert con.execute("SELECT kind, amount FROM cash_events").fetchall() == [("dividend", 5.0)]
+        raw = json.loads(con.execute("SELECT raw_json FROM raw_rows WHERE row_no=1").fetchone()[0])
+        assert raw["fees_source"].startswith("estimated") and raw["source"] == "manual://screenshot_test"
+    with pytest.raises(ValueError, match="already imported"):
+        st.import_manual(f, db)
+    for bad in ({**spec, "source": "screenshot"},                                             # must be manual://
+                {**spec, "fills": [{**spec["fills"][0], "ticker": "XXXX.CA"}]},                # unknown ticker
+                {**spec, "fills": [spec["fills"][1]]}):                                       # sell with no buy
+        f.write_text(json.dumps(bad), encoding="utf-8")
+        with pytest.raises(ValueError):
+            st.import_manual(f, tmp_path / "other.db")

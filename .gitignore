@@ -36,3 +36,4 @@ personal_journal/prices/*
 !personal_journal/prices/.gitkeep
 personal_journal/statements/
 outputs/
+personal_journal/manual_entries/

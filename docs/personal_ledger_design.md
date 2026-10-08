@@ -144,3 +144,16 @@ Prerequisites, not started (no new modules yet): every signal stored with source
 stores each rebalance's top 10; the scanner writes `daily_reports`; EGXBot is stored as raw text in `tg_raw` only);
 a parser for EGXBot's text; a direction/price field common to all sources; a signal↔trip link table. Matching rule unchanged (same ticker, preceding 2
 sessions). Note: statements have no time of day, so "preceding 2 sessions" is counted in whole sessions.
+
+## Manual rows + open notes (2026-10-08)
+
+- **Source tag = `imports.file_name`** (no migration): statement rows carry the statement file name; rows Ahmed
+  confirmed outside a statement carry `manual://<what>_<date>` (first: `manual://screenshot_2026-10-08`, Thndr app
+  screenshots — 6 fills + the ETEL dividend 32.78 on 2026-04-30, the buys behind July's 4 sells). Filter:
+  `JOIN imports ON imports.id = fills.import_id WHERE file_name LIKE 'manual://%'`. Entered with
+  `import_statement.import_manual(json)`; the JSON lives in `personal_journal/manual_entries/` (gitignored).
+  Screenshots show no fees: manual fills' `total_fees` = fees_config estimate, `fees_source: estimated` in raw_rows.
+- **Pending orders — not tracked (deferred, no table):** CIRA sell 40 @ 45.00 placed 2026-10-06, not executed as of
+  2026-10-08. Statements list executions only; add a table when pending orders are actually needed.
+- **FIFO round trips — deferred, but a dependency:** the strategy factory's Registry + Reports layer (Phase 1c) needs
+  P/L per trip, so FIFO is built there once instead of twice. Until then `round_trips` stays empty.
