@@ -211,3 +211,20 @@ def test_signal_on_zero_volume_candle_is_rejected() -> None:
     d.iloc[-1, d.columns.get_loc("Volume")] = 0
     assert eng.evaluate_4_mirrors(eng.calculate_indicators(d), eng.SignalConfig())["signal"] == "SKIPPED_ZERO_VOLUME"
     assert eng.evaluate_4_mirrors(eng.calculate_indicators(_flat(70)), eng.SignalConfig())["signal"] != "SKIPPED_ZERO_VOLUME"
+
+
+def test_changing_only_open_never_changes_indicators_or_signals() -> None:  # Gap_Pct removed 2026-10-08
+    rng = np.random.default_rng(11)
+    idx = pd.date_range("2026-01-04 12:00", periods=120, freq="D", tz=eng.CAIRO_TZ).tz_convert("UTC")  # noon: no DST gap
+    for _ in range(10):
+        d = pd.DataFrame({"Open": 100.0}, index=idx)
+        close = 100 * np.exp(np.cumsum(rng.normal(0.003, 0.02, 120)))
+        d["Close"], d["High"], d["Low"] = close, close * 1.01, close * 0.99
+        d["Volume"] = rng.integers(500_000, 3_000_000, 120).astype(float)
+        other = d.copy()
+        other["Open"] = close * rng.uniform(0.85, 1.15, 120)        # gaps of up to ±15% on every bar
+        a, b = eng.calculate_indicators(d), eng.calculate_indicators(other)
+        pd.testing.assert_frame_equal(a.drop(columns="Open"), b.drop(columns="Open"))
+        for i in range(60, 120, 5):
+            assert eng.evaluate_4_mirrors(a.iloc[: i + 1], eng.SignalConfig())["signal"] == \
+                eng.evaluate_4_mirrors(b.iloc[: i + 1], eng.SignalConfig())["signal"]

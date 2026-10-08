@@ -4,6 +4,7 @@
 
 | Status | Item | Section |
 |---|---|---|
+| 🔴 Open | Entry price mismatch: live scanner shows Close[i] (unattainable), backtest assumes Close[i+1] — documented, not fixed (strategy on hold) | Execution conventions |
 | 🔴 Open | Data health crashes on the Cairo DST spring-forward midnight (only matters for a Friday session / intraday data) | Data health fails on Cairo DST… |
 | 🔴 Open | Yahoo misses whole EGX sessions for stocks (e.g. 2026-06-22, 08-10, 10-06); ~2–4.5%/yr lower bound | Missing EGX sessions in Yahoo |
 | 🔴 Open | Yahoo misdates/omits split adjustments in `data/` (HDBK, EFID, INFI, …) — guarded by `DATA_BREAK`, not corrected | Execution conventions |
@@ -134,10 +135,25 @@ Applies to `backtest`, `backtest_optimizer` (all modes, `simulate_d`), `auto_sim
   and lies outside [Low, High] 18.2% of the time. No fill uses the Open (2026-10-08): a gap fills at that bar's
   Close — repro of the old bug: ABUK 2026-03-08, Open 77.93 below
   Low 83.0, filled at a price the stock never traded.
-  `Gap_Pct` in the signal screen (`max_gap_pct` filter, signal side, not execution) still uses it and is therefore
-  close to 0 on most bars (strategy is ABANDON anyway).
+  **Gap_Pct removed 2026-10-08 (dead code):** the `max_gap_pct` signal filter measured the signal bar's Open vs the
+  previous Close; with Yahoo's Open ≈ previous Close on 98% of bars it blocked ~3 BUY signals a year (72 of 22,500
+  bars fired). No look-ahead was involved (signal on a closed bar, entry at Close[i+1]). Worth revisiting only with
+  a data source whose Open is a real opening price; a Close-to-Close version is a different filter (would block 161).
+  Backtest after removal: 289 trades (was 287), +67,324 EGP (was +69,041): 3 signals returned (ATLC 08-10, FERC
+  08-10 and 09-01; FERC 08-11 shifted out), all losers; still 12/90 above B&H → ABANDON stands.
+  No signal, indicator or fill reads Open any more; it is only drawn on the dashboard candlestick and validated by
+  data_health. The unused legacy `egx_4_mirrors_v2.py` (nothing imports it) still has the old filter.
 - **Entry = close of the session after the signal.** Signals are computed after the close (daily runner 14:45, data
   cutoff 14:30), so the signal-day close is not executable. Exits are checked from the bar after the entry bar.
+- **Entry price mismatch (live vs backtest), found 2026-10-08:** the live scanner (`build_trade_plan`:
+  `entry = float(last["Close"])`, shown as "Entry" in the daily report, Telegram, dashboard tabs 2/9) displays
+  **Close[i]** — the close of the signal candle — and sizes SL, TP and shares from it. The backtest, the optimizer and
+  auto_sim fill at **Close[i+1]**. Close[i] is unattainable: the signal needs that close to exist, and a market-on-close
+  order would have to be placed before the signal is known; in practice the entry is the next session. So the
+  backtest is the realistic one and the live display is optimistic by one session (and SL/TP/shares are computed from
+  a price you will not get). Not fixed — the strategy is on hold. Fix when it returns: show Close[i] as "signal price"
+  and label the entry as "next session (expected ≈ Close[i+1])", or accept the display as approximate with a UI note.
+  Independent of Gap_Pct: removing that filter does not change this.
 - **Fills, filler rows, data breaks (superseded 2026-10-07 by `docs/execution_policy.md`):** stop/target fill at
   the level, or on a gap at that bar's Close (never the Open); zero-volume rows never fill; a move beyond ±25% per
   elapsed session either way is a data break and a trade across it is **cancelled** (excluded and counted), not

@@ -66,7 +66,7 @@ OHLCV = ("Open", "High", "Low", "Close", "Volume")
 STATUS_COLORS = {
     "BUY": "#16794b",
     "WAIT": "#b7791f",
-    "SKIP_GAP": "#6b7280",
+    "SKIPPED_ZERO_VOLUME": "#6b7280",
     "NO_TREND": "#c05621",
     "SCREEN_FAIL": "#9ca3af",
 }
