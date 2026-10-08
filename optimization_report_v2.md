@@ -1,4 +1,4 @@
-# Optimization Report v2 — 4 Mirrors v3 + Hybrid (generated 2026-10-08 03:12)
+# Optimization Report v2 — 4 Mirrors v3 + Hybrid (generated 2026-10-08 04:03)
 
 Execution is **realistic for every number in this report**: entry at the close after the signal, first exit on the bar after that; fills per `docs/execution_policy.md` (level, or that bar's Close on a gap — never the Open; zero-volume rows never fill; trades across a data break cancelled). A/B/C/Baseline = one independent 100,000 EGP account per stock; D = one shared account of the same total; Buy & Hold = equal weight, same window.
 
@@ -20,13 +20,13 @@ Selected **4×ATR** (highest PF) — used for C below and carried unchanged into
 
 | Scenario | Trades | Win rate | Profit factor | Max DD | Sharpe | Total return | CAGR | Avg capital deployed | Mean R | P(mean R ≤ 0) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Baseline | 287 | 44.9% | 1.56 | -0.25% | 2.60 | +0.77% | +1.00% | 2.8% | 0.24 | 0.1% |
-| A_filters | 84 | 47.6% | 1.48 | -0.10% | 1.62 | +0.21% | +0.27% | 0.9% | 0.21 | 6.5% |
-| B_risk | 265 | 48.3% | 2.05 | -0.24% | 3.43 | +0.98% | +1.28% | 2.4% | 0.32 | 0.0% |
+| Baseline | 289 | 44.6% | 1.54 | -0.25% | 2.53 | +0.75% | +0.98% | 2.8% | 0.23 | 0.1% |
+| A_filters | 84 | 47.6% | 1.48 | -0.10% | 1.62 | +0.21% | +0.27% | 0.9% | 0.21 | 6.9% |
+| B_risk | 266 | 48.1% | 2.02 | -0.24% | 3.38 | +0.97% | +1.27% | 2.4% | 0.31 | 0.0% |
 | C_trend | 296 | 44.3% | 3.16 | -0.17% | 4.67 | +1.86% | +2.44% | 3.5% | 0.55 | 0.0% |
-| D_hold_4 | 20 | 55.0% | 1.21 | -4.20% | 0.22 | +0.97% | +1.26% | 20.2% | 0.22 | 11.0% |
+| D_hold_4 | 20 | 55.0% | 1.21 | -4.20% | 0.22 | +0.97% | +1.26% | 20.2% | 0.22 | 10.8% |
 | D_hold_5 | 24 | 50.0% | 3.56 | -5.64% | 1.33 | +13.93% | +18.56% | 38.5% | 0.39 | 6.2% |
-| D_hold_6 | 29 | 44.8% | 4.17 | -4.27% | 1.75 | +19.34% | +25.97% | 44.3% | 0.58 | 3.3% |
+| D_hold_6 | 29 | 44.8% | 4.17 | -4.27% | 1.75 | +19.34% | +25.97% | 44.3% | 0.58 | 3.4% |
 | **Buy & Hold (equal weight)** | — | — | — | -12.31% | 2.76 | +44.04% | +61.03% | 100% | — | — |
 
 ## Phase 3 — 2022–2023 (warm-up from 2021, test from 2022-01-01)

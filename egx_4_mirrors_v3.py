@@ -77,7 +77,6 @@ class ScreenConfig:
 
 @dataclass(frozen=True)
 class SignalConfig:
-    max_gap_pct: float = 4.0
     min_adx: float = 20.0
     rsi_min: float = 50.0
     rsi_max: float = 70.0
@@ -243,8 +242,6 @@ def _indicators(data: pd.DataFrame) -> pd.DataFrame:
     data["VWAP_20"] = price_volume.rolling(20).sum() / volume.rolling(20).sum().replace(0, np.nan)
     data.attrs["intraday"] = bool(cairo_days.duplicated().any())
     data["VWAP_ref"] = data["VWAP_day"] if data.attrs["intraday"] else data["VWAP_20"]
-
-    data["Gap_Pct"] = (data["Open"] - prev_close) / prev_close * 100
     return data
 
 
@@ -289,8 +286,6 @@ def evaluate_4_mirrors(df: pd.DataFrame, signal_cfg: SignalConfig) -> dict[str, 
 
     if float(last["Volume"]) <= 0:   # Ahmed 2026-10-08: missing data, its indicators are NaN → rejected, not deferred
         return {"signal": "SKIPPED_ZERO_VOLUME", "mirrors": mirrors, "row": last}
-    if abs(float(last.get("Gap_Pct", 0) or 0)) > signal_cfg.max_gap_pct:
-        return {"signal": "SKIP_GAP", "mirrors": mirrors, "row": last}
     if float(last["ADX"]) < signal_cfg.min_adx:
         return {"signal": "NO_TREND", "mirrors": mirrors, "row": last}
 

@@ -306,7 +306,7 @@ def _edge(trades: pd.DataFrame, rng: np.random.Generator) -> dict[str, float]:
 
 SCENARIOS: dict[str, Scenario] = {
     "Baseline": Scenario("Baseline"),
-    "A_filters": Scenario("A_filters", signal=eng.SignalConfig(min_adx=25.0, rsi_min=55.0, rsi_max=65.0, volume_multiplier=1.5, max_gap_pct=2.0)),
+    "A_filters": Scenario("A_filters", signal=eng.SignalConfig(min_adx=25.0, rsi_min=55.0, rsi_max=65.0, volume_multiplier=1.5)),
     "B_risk": Scenario("B_risk", risk=eng.RiskConfig(atr_sl_mult=2.5, reward_risk=3.0), be_trigger_atr=2.0, lock_trigger_atr=3.0, time_stop_days=15),
     "C_trend": Scenario("C_trend", kind="trend"),
 }
