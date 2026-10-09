@@ -52,6 +52,8 @@ def run(strategy: BaseStrategy, data_map: dict[str, pd.DataFrame], cfg: eng.Syst
     mode, provenance = eng.resolve_dividend_mode(dataset_path, dividend_mode)
     # Mirrors plans are mirror-specific: None is NOT a dispatch sentinel.
     is_legacy = isinstance(strategy, TrendMirrors)
+    # Subclasses may override generate_signals; preserve their existing path.
+    fast_legacy = type(strategy) is TrendMirrors
     path = "legacy-path" if is_legacy else "new-path"
     risk = cfg.risk
     rows, cancellations, curves, fingerprints = [], [], {}, {}
@@ -87,16 +89,25 @@ def run(strategy: BaseStrategy, data_map: dict[str, pd.DataFrame], cfg: eng.Syst
         i, equity = start, risk.capital
         events = {data.index[start]: equity} if len(data) > start else {}
         while i < len(data) - 1:
-            prefix = data.loc[:, list(eng.REQUIRED_COLUMNS) + (["Dividends"] if "Dividends" in data else [])].iloc[:i + 1].copy()
-            prefix.attrs.clear()
-            window = eng.calculate_indicators(prefix)
-            # ponytail: prefix evaluation is O(n^2); optimize only with a tested
-            # incremental strategy API, never expose future bars for speed.
-            signals = strategy.generate_signals(window.copy())
-            if (not isinstance(signals, pd.Series) or not signals.index.equals(window.index)
-                    or not signals.isin([BUY, WAIT, EXIT]).all()):
-                raise ContractError(f"{ticker}: signals must align with the prefix and contain BUY/WAIT/EXIT")
-            if signals.iloc[-1] != BUY:
+            if fast_legacy:
+                # Indicators are prefix-invariant; only the current closed bar
+                # is evaluated. Defensive copies prevent strategy mutation.
+                window = data.iloc[:i + 1].copy()
+                signal = strategy.evaluate_bar(window.copy())
+                if signal not in (BUY, WAIT, EXIT):
+                    raise ContractError(f"{ticker}: evaluate_bar must return BUY/WAIT/EXIT")
+            else:
+                # ponytail: generic/subclass history evaluation stays O(n^2);
+                # optimize separately against its own pre-change baseline.
+                prefix = data.loc[:, list(eng.REQUIRED_COLUMNS) + (["Dividends"] if "Dividends" in data else [])].iloc[:i + 1].copy()
+                prefix.attrs.clear()
+                window = eng.calculate_indicators(prefix)
+                signals = strategy.generate_signals(window.copy())
+                if (not isinstance(signals, pd.Series) or not signals.index.equals(window.index)
+                        or not signals.isin([BUY, WAIT, EXIT]).all()):
+                    raise ContractError(f"{ticker}: signals must align with the prefix and contain BUY/WAIT/EXIT")
+                signal = signals.iloc[-1]
+            if signal != BUY:
                 i += 1
                 continue
             if is_legacy:

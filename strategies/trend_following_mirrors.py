@@ -32,13 +32,22 @@ class TrendMirrors(BaseStrategy):
     def get_params(self) -> dict[str, Any]:
         return {"screen": asdict(self.screen), "signal": asdict(self.signal), "warmup": WARMUP}
 
+    def evaluate_bar(self, data: pd.DataFrame) -> int:
+        """Current signal only, on a causal prefix with engine indicators.
+
+        The caller owns indicator computation; rows begin at the original
+        first bar and end at the closed decision bar. No execution or sizing.
+        """
+        if len(data) <= WARMUP:
+            return WAIT
+        return BUY if (eng.passes_screener(data, self.screen)[0]
+                       and eng.evaluate_4_mirrors(data, self.signal)["signal"] == "BUY") else WAIT
+
     def generate_signals(self, data: pd.DataFrame) -> pd.Series:
         # Indicators are causal (EMA/Wilder/rolling/cumsum over past bars only), so computing them once and slicing
         # equals the engine's per-window recompute; test_strategies.py checks this against the engine.
         ind = eng.calculate_indicators(data)
         out = pd.Series(WAIT, index=ind.index, dtype=int)
         for i in range(WARMUP, len(ind)):
-            window = ind.iloc[: i + 1]
-            if eng.passes_screener(window, self.screen)[0] and eng.evaluate_4_mirrors(window, self.signal)["signal"] == "BUY":
-                out.iloc[i] = BUY
+            out.iloc[i] = self.evaluate_bar(ind.iloc[: i + 1])
         return out
