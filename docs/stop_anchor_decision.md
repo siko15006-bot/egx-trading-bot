@@ -1,15 +1,34 @@
 # P1B-STOP-ANCHOR: decision brief
 
-Status: OPEN. Decision owner: Ahmed. Technical recommendation: Codex.
-Documented difference: neither accepted nor classified as a defect pending
-Ahmed's contract decision. Possible effects are demonstrated below, not ruled out.
+Status: CLOSED by Ahmed on 2026-10-09 (reference decision only).
+Technical recommendation: Codex. Verification debt remains open.
+
+## Approved decision (2026-10-09)
+
+1. The project adopts actual execution price as the stop/sizing reference.
+2. Legacy is noncompliant with the actual-execution position-value cap:
+   19 of 50 net-assumption completed trades (38%) exceeded it.
+3. Legacy is frozen as a research reference only, not an acceptance criterion.
+   Any future production path must use actual execution price.
+4. No legacy correction is made in this phase. Any correction is separate work.
+
+Legacy results remain restricted by this classification. Closing this decision
+does not prove legacy/new-path parity. test_legacy_vs_new_path_trade_match
+remains SKIPPED until full-trade verification is implemented. No code, data
+or acceptance-gate change follows from this documentation.
+
+The technical analysis below was prepared before approval and is retained
+as historical rationale; its previously pending contract question is resolved
+by the decision above, not by a code migration.
+
+## Historical decision brief
 Prepared 2026-10-09 against HEAD 08e167b. No model change or new backtest.
 Consistency check 2026-10-09: git grep confirms build_trade_plan entry at
 signal Close (engine line 365), cap sizing at line 348, planned value at
 line 411, and simulate_trade actual entry at next-bar Close (line 528).
 Observed execution is actual next-bar Close, not the plan reference.
-Pending Ahmed: must the cap constrain actual execution value, or only planned
-value? A planned 200 shares at 100 becomes 20,400 at entry 102, exceeding a
+Historical question, now resolved: must the cap constrain actual execution
+value, or only planned value? A planned 200 shares at 100 becomes 20,400 at entry 102, exceeding a
 20,000 actual-value cap. If the contract requires that cap at execution,
 this is a legacy enforcement defect, not an acceptable anchor difference.
 The final allowed-difference catalogue must follow Ahmed's specification
@@ -122,7 +141,8 @@ re-anchor TrendMirrors to retire the debt or force a passing parity test.
 If one unified model is required, prefer actual-entry anchoring for that NEW
 model, including recalculated sizing/value/risk and an explicit target-cost
 policy. Treat migration as a separate reviewed impact analysis, not a refactor.
-This recommendation has not been accepted; current code remains unchanged.
+Ahmed has now adopted actual-execution anchoring for future production and
+retained legacy as a noncompliant research reference. Current code is unchanged.
 
 ## Decision and verification boundary
 
@@ -134,3 +154,16 @@ because the stop anchor is chosen; replace/revise its purpose only with an
 explicit reviewed contract and genuinely implemented verification.
 
 No MC gate change, no push, no D strategy and no new optimization are included.
+
+## Remaining open items
+
+- P1B-DIFF-TEST: cancellation path and broader differential edge coverage.
+- Dynamic dispatch: documented limitation; runtime verification deferred.
+- test_legacy_vs_new_path_trade_match: SKIPPED.
+- New-path versus legacy parity: unverified.
+- VWAP definition against an external specification: unverified.
+- Human approval of the evidence file: pending; this decision is not that approval.
+- Expansion to 20 stocks: outside the current scope.
+
+See KNOWN_ISSUES.md for verification debt. This closes the reference decision,
+not those items; no further implementation is authorized by this closure.

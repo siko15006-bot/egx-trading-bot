@@ -237,16 +237,18 @@ identity. This does not resolve the legacy-versus-new-path trade-match debt.
 
 ## Phase 1b two-path debt
 
-### Open items (post-08e167b)
+### Open items (updated 2026-10-09)
 
 Closing the optimization review does not resolve these items:
-- P1B-STOP-ANCHOR: decision owner Ahmed; see docs/stop_anchor_decision.md.
+- P1B-STOP-ANCHOR: CLOSED by Ahmed on 2026-10-09; see the decision below.
+  This is not closure of trade-parity verification.
 - P1B-DIFF-TEST: cancellation decisions and broader edge coverage remain open.
 - P1B-DYNAMIC-DISPATCH: runtime-substitution verification deferred.
 - test_legacy_vs_new_path_trade_match: still SKIPPED.
 - New-path versus legacy full-trade parity: unverified; stop choice alone is insufficient.
 - VWAP definition: not checked against an external specification.
 - Human sign-off on the local evidence file: pending; AI review is not approval.
+- Expansion to 20 stocks: outside the current scope.
 
 ### P1B-DIFF-TEST: broader differential verification (OPEN, P2)
 
@@ -282,11 +284,16 @@ total copying cost; remove them only if profiling and a read-only contract
 justify it. No execution math or stop-anchor reconciliation is part of this
 optimization. See docs/legacy_runner_performance.md for timing and regression.
 
-### TODO P1B-STOP-ANCHOR: legacy/new-path stop reference differs
+### P1B-STOP-ANCHOR: CLOSED reference decision (2026-10-09)
 
 Opened 2026-10-09. Decision owner: Ahmed; technical reviewer: Codex.
-Status: OPEN model-reconciliation debt. The temporary split was approved;
-equivalence was not. Only an explicit reviewed model decision can close it.
+Closed by Ahmed on 2026-10-09. Adopted project reference: actual execution
+price, including any future production path's stop/sizing reference.
+Legacy is noncompliant with the actual-execution position-value cap:
+19/50 completed net-assumption trades (38%). It is frozen as a research
+reference for byte-regression only, not an acceptance criterion. No legacy
+fix in this phase; any correction requires separate work. Decision recorded
+in docs/stop_anchor_decision.md. Full-trade verification debt remains open.
 
 Legacy build_trade_plan anchors its initial stop to Close[signal_index]:
 stop = Close[signal_index] - atr_sl_mult * ATR[signal_index]. The generic
@@ -314,7 +321,7 @@ initial stop/target, shares, reason, costs/P&L and cancellations. Plan snapshots
 are not sufficient. test_plan_sizing.py::test_legacy_runner_trade_match now checks
 the real runner against a pre-C frozen completed-trade fingerprint and the
 original backtest, including initial levels, shares, P&L and cancellation.
-The debt is retired only when full-trade identity between both paths is proved
+The verification debt is retired only when full-trade identity between both paths is proved
 on agreed fixtures. Model changes require a separate reviewed impact analysis.
 test_legacy_vs_new_path_trade_match remains SKIPPED for this debt-retirement
 condition; test_legacy_runner_trade_match is a separate regression test, not
