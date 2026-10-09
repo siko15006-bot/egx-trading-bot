@@ -1,9 +1,30 @@
 # P1B-STOP-ANCHOR: decision brief
 
 Status: OPEN. Decision owner: Ahmed. Technical recommendation: Codex.
+Documented difference: neither accepted nor classified as a defect pending
+Ahmed's contract decision. Possible effects are demonstrated below, not ruled out.
 Prepared 2026-10-09 against HEAD 08e167b. No model change or new backtest.
+Consistency check 2026-10-09: git grep confirms build_trade_plan entry at
+signal Close (engine line 365), cap sizing at line 348, planned value at
+line 411, and simulate_trade actual entry at next-bar Close (line 528).
+Observed execution is actual next-bar Close, not the plan reference.
+Pending Ahmed: must the cap constrain actual execution value, or only planned
+value? A planned 200 shares at 100 becomes 20,400 at entry 102, exceeding a
+20,000 actual-value cap. If the contract requires that cap at execution,
+this is a legacy enforcement defect, not an acceptable anchor difference.
+The final allowed-difference catalogue must follow Ahmed's specification
+decision, not be inferred from the current behavior inventory below.
 
 ## Verified current behavior
+
+Production-code entry points use v3 build_trade_plan: signal_engine.build_signals,
+bot_handlers and egx_dashboard; validation.runner is the separate Phase 1b
+validation path. This identifies repository wiring, not a verified live deployment.
+Stop consumers: v3 plan construction/_net_reward_risk, backtest/simulate_trade,
+validation.runner, backtest_optimizer, signal_engine, bot_handlers,
+egx_dashboard, auto_sim.replay (stored stop0), and paper_trading (explicit
+trade.stop_loss, not a direct plan call). Located by git grep on
+plan.stop_loss, atr_sl_mult, stop0 and stop_given; arbitrary dynamic calls are excluded.
 
 - egx_4_mirrors_v3.py::build_trade_plan uses the signal candle's Close for
   plan.entry, initial stop, sizing reference and position value. Initial
@@ -22,6 +43,51 @@ The difference is a model choice, not evidence of look-ahead by itself.
 Signal-anchored levels can be intentional pre-entry technical levels;
 entry-relative multiples can be an intentional distance-based risk policy.
 However, planned risk/value in legacy are not generally actual-entry risk/value.
+
+## When the difference appears
+
+The 243-byte-identical-trade evidence is legacy BEFORE versus legacy AFTER
+optimization, never legacy versus generic. It supports neither explanation
+that sizing ignores stop distance nor that the anchor difference was dormant
+on these 9 stocks; that cross-path experiment has not been performed.
+
+position_size explicitly uses floor(risk_budget / risk_per_share). For equal
+ATR and stop multiples, both CURRENT paths pass k*ATR as that distance:
+signal_close - (signal_close-k*ATR) = entry - (entry-k*ATR) = k*ATR.
+Thus moving both entry and stop anchors together does not alone change the
+risk-cap share count. Actual-entry loss distance in legacy DOES change by
+entry-signal_close. Recomputing legacy sizing against its fixed signal stop
+would instead pass entry-signal_stop; that is a proposed change, not current code.
+
+Current sizing can still differ through the position-value cap: it divides
+by signal Close in legacy and actual entry in generic. With a position cap
+of 20,000 EGP and the other limits above 200 shares, Close=100 vs entry=102
+gives floor(20000/100)=200 vs floor(20000/102)=196. The trigger is a binding
+value cap and different floored limits. It is entirely possible on other data.
+Different multiples also change the risk cap if that cap governs the minimum.
+Exit differences occur when a later bar touches one stop but not the other;
+entry eligibility differs when entry crosses the legacy stop or target.
+These effects already have explicit examples below. Their possibility does
+not establish which model satisfies an as-yet undecided strategy contract.
+
+## Documented path differences
+
+| Surface | Legacy TrendMirrors | Generic validation path |
+|---|---|---|
+| Signal source | Four-mirror adapter plus mirror-specific plan checks | Strategy generate_signals |
+| Initial stop anchor | Signal Close | Actual next-bar Close |
+| Target | Signal-relative, adjusted for required net reward/risk | Entry-relative ATR multiple, no equivalent target expansion |
+| Sizing/value | Signal Close and planned risk distance | Actual entry and resolved stop distance |
+| Reported R denominator | Planned risk_egp, including stop costs | Raw actual-entry distance times shares |
+| Trailing | Enabled | Disabled |
+| Final-bar entry | Existing END behavior retained | Requires a post-entry bar |
+| Nonpositive stop | No equivalent explicit plan guard | ContractError aborts run |
+| VWAP definition | Shared causal engine VWAP_ref | Same shared causal engine VWAP_ref |
+
+VWAP's intraday/mixed fix is not new-path-only. The engine definition is
+shared, and tested causal prefixes match precomputed indicator slices.
+This table inventories inspected differences; it is not proof that no
+unlisted difference exists under every input or dynamic substitution.
 
 ## Hand-derived discriminating scenarios
 

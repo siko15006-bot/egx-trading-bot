@@ -256,6 +256,13 @@ cover a zero-volume bar, a single-bar input and a Cairo-session boundary.
 These do not exhaust mirror branches, rare cancellations or arbitrary inputs.
 Seeded random differential testing is deferred until after the optimization
 commit; keep the original implementation as its oracle. Not generic-path parity.
+Future contract option, not yet approved: compare the two paths against an
+explicit allowed-difference catalogue instead of demanding equality. Assert
+that observed differences belong to documented categories using targeted
+scenarios, not a blanket exemption for entire fields. Do not repurpose the
+skipped parity test until Ahmed approves the revised verification contract.
+Define that catalogue from the approved specification, not existing code:
+the current behavior inventory cannot authorize an existing defect.
 The 9-stock regression produced zero cancellations: its cancellation path was
 not executed. Empty CSV identity is not cancellation validation; coverage of
 that decision path remains a responsibility of P1B-DIFF-TEST.
