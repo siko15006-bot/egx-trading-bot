@@ -237,6 +237,17 @@ identity. This does not resolve the legacy-versus-new-path trade-match debt.
 
 ## Phase 1b two-path debt
 
+### Open items (post-08e167b)
+
+Closing the optimization review does not resolve these items:
+- P1B-STOP-ANCHOR: decision owner Ahmed; see docs/stop_anchor_decision.md.
+- P1B-DIFF-TEST: cancellation decisions and broader edge coverage remain open.
+- P1B-DYNAMIC-DISPATCH: runtime-substitution verification deferred.
+- test_legacy_vs_new_path_trade_match: still SKIPPED.
+- New-path versus legacy full-trade parity: unverified; stop choice alone is insufficient.
+- VWAP definition: not checked against an external specification.
+- Human sign-off on the local evidence file: pending; AI review is not approval.
+
 ### P1B-DIFF-TEST: broader differential verification (OPEN, P2)
 
 Opened 2026-10-09. The legacy algorithmic optimization is checked against
