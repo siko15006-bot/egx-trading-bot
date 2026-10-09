@@ -245,6 +245,9 @@ cover a zero-volume bar, a single-bar input and a Cairo-session boundary.
 These do not exhaust mirror branches, rare cancellations or arbitrary inputs.
 Seeded random differential testing is deferred until after the optimization
 commit; keep the original implementation as its oracle. Not generic-path parity.
+The 9-stock regression produced zero cancellations: its cancellation path was
+not executed. Empty CSV identity is not cancellation validation; coverage of
+that decision path remains a responsibility of P1B-DIFF-TEST.
 
 ### P1B-DYNAMIC-DISPATCH: runtime substitution verification (OPEN, P3)
 
@@ -279,7 +282,9 @@ it cannot establish that this difference is harmless on those data because
 no generic-path run was compared. test_legacy_vs_new_path_trade_match stays
 SKIPPED, not a passing assertion. Do not change its expectations or remove
 the split merely to make a performance regression pass. See
-docs/vwap_regression_evidence.md for independent-oracle and hash evidence.
+the local, untracked docs/vwap_regression_evidence.md for supplementary notes
+(not distributed with a clone). The tracked docs/legacy_runner_performance.md
+records the optimization scope, raw hashes and verification limitations.
 
 validation/runner.py dispatches TrendMirrors by strategy type to build_trade_plan
 (legacy-path), and other strategies to generate_signals + exit_policy (new-path).

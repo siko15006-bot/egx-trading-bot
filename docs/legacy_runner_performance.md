@@ -6,6 +6,9 @@ Optimize only concrete TrendMirrors legacy execution. Not new-path parity.
 Classification: algorithmic optimization, outputs verified byte-identical
 on the 9-stock regression. This is not universal equivalence on all inputs.
 Reference: outputs/phase1b_baseline_legacy/trades.csv, 243 trades on 9 stocks.
+This is a local, Git-ignored artifact, not a file supplied by a fresh clone.
+The raw hashes below are the tracked record; reproduction needs those local
+inputs and baseline artifacts. Missing artifacts are not evidence of a pass.
 Criterion frozen before edits: >=5x faster on the first 250 COMI rows compared
 with the original 7aacc48 runner/strategy; unchanged subset results and full
 243-trade CSV plus cancellation CSV byte identity. No new strategy or gate.
@@ -47,6 +50,10 @@ data loading, CSV exports and frozen-code extraction:
 | Optimized full 9-stock run | about 40 s (initial run) |
 | Full completed/cancelled | 243 / 0 |
 
+The cancellation path was not executed on these 9-stock data. Matching empty
+cancellation CSVs does not validate cancellation decisions; broader coverage
+is assigned to P1B-DIFF-TEST.
+
 Subset trade/cancellation CSV bytes, exact equity curve and metadata match.
 Full CSV matches the ORIGINAL reference including header, row order, numeric
 text and CRLF. No float rounding or reference reserialization is used for
@@ -61,8 +68,8 @@ raw-file hashes before simulation and records them in the final report. Original
 artifacts, engine, parity-skip file and old VWAP README were not changed.
 
 This is one paired wall-clock measurement, not a timing-distribution study
-or a performance guarantee across machines. The original 200-minute run is
-historical evidence, not a contemporaneous full-run timing comparison.
+or a performance guarantee across machines. Historical pre-optimization
+timing is archival context only, not a contemporaneous full-run comparison.
 
 ## Reproduce
 
@@ -241,8 +248,12 @@ test_runner_performance.py, this performance record.
 
 Separate documentation scope: KNOWN_ISSUES.md (sticky VWAP behavior, path
 debt, P1B-DIFF-TEST and P1B-DYNAMIC-DISPATCH). The prior evidence files
-test_indicator_causality.py, docs/vwap_regression_evidence.md and
-docs/vwap_regression_evidence.review.md remain outside the optimization commit.
+test_indicator_causality.py (local uncommitted additions),
+docs/vwap_regression_evidence.md and docs/vwap_regression_evidence.review.md
+(local untracked references, not distributed with a clone) remain outside
+the optimization commit. This tracked report is self-contained for its
+recorded scope, hashes and limitations; those local notes are not required
+reading or an additional verification claim.
 Exclude unchanged untracked docs/atr_filter_negative_result.md,
 docs/entry_candle_exits_investigation.md, docs/mirrors_failure_analysis.md,
 docs/trade_predictors.md from both scopes. No data, engine math or gate change;
