@@ -222,7 +222,64 @@ this repo). `egx_lists.filter_universe` applies it everywhere: dashboard, scanne
 - Decision 2026-10-07: universe unchanged for now; widening is deferred until the personal ledger
   (`docs/personal_ledger_design.md`) shows which stocks Ahmed actually trades.
 
+## Intentional mixed-file VWAP mode (7aacc48)
+
+VWAP_ref selects its mode using only positive-volume bars available at each
+bar, grouped by Cairo calendar date. The first real bar uses VWAP_20 (NaN
+before its 20-bar warmup). The first repeated-date real bar switches to
+VWAP_day; all subsequent real bars keep VWAP_day, even if the file returns
+to one bar per day. "Once intraday, always intraday" is intentional for
+daily -> intraday -> daily files, not an implicit inference from future rows.
+Intraday_So_Far records this causal, sticky state per bar. Zero-volume rows
+do not activate it. Historical values remain unchanged when future bars join.
+test_indicator_causality.py covers the mixed-file behavior and exact prefix
+identity. This does not resolve the legacy-versus-new-path trade-match debt.
+
 ## Phase 1b two-path debt
+
+### P1B-DIFF-TEST: broader differential verification (OPEN, P2)
+
+Opened 2026-10-09. The legacy algorithmic optimization is checked against
+7aacc48 on 9 stocks and small synthetic cases. Minimal full-result comparisons
+cover a zero-volume bar, a single-bar input and a Cairo-session boundary.
+These do not exhaust mirror branches, rare cancellations or arbitrary inputs.
+Seeded random differential testing is deferred until after the optimization
+commit; keep the original implementation as its oracle. Not generic-path parity.
+
+### P1B-DYNAMIC-DISPATCH: runtime substitution verification (OPEN, P3)
+
+Opened 2026-10-09. The current runner call path and subclass fallback are
+checked. Arbitrary monkeypatch/importlib/registry/decorator substitutions
+are not covered. A permanent dynamic-dispatch guard is deferred, not implied
+by the existing regression. See docs/legacy_runner_performance.md.
+
+Performance scope: only the concrete TrendMirrors legacy runner uses cached
+causal indicators and evaluate_bar. Generic strategies and subclasses keep
+the original prefix/history path; their quadratic work is deferred until an
+own-path baseline is frozen. Defensive prefix copies still have quadratic
+total copying cost; remove them only if profiling and a read-only contract
+justify it. No execution math or stop-anchor reconciliation is part of this
+optimization. See docs/legacy_runner_performance.md for timing and regression.
+
+### TODO P1B-STOP-ANCHOR: legacy/new-path stop reference differs
+
+Opened 2026-10-09. Decision owner: Ahmed; technical reviewer: Codex.
+Status: OPEN model-reconciliation debt. The temporary split was approved;
+equivalence was not. Only an explicit reviewed model decision can close it.
+
+Legacy build_trade_plan anchors its initial stop to Close[signal_index]:
+stop = Close[signal_index] - atr_sl_mult * ATR[signal_index]. The generic
+runner anchors to actual entry Close[signal_index+1]:
+stop = Close[signal_index+1] - stop_mult * ATR[signal_index]. For example,
+signal Close=100, entry Close=110, ATR=2 and multiplier=1.5 imply stops 97
+and 107 respectively. Target/cost handling also needs full-trade review.
+
+The 243-trade VWAP regression compares legacy before/after 7aacc48 ONLY;
+it cannot establish that this difference is harmless on those data because
+no generic-path run was compared. test_legacy_vs_new_path_trade_match stays
+SKIPPED, not a passing assertion. Do not change its expectations or remove
+the split merely to make a performance regression pass. See
+docs/vwap_regression_evidence.md for independent-oracle and hash evidence.
 
 validation/runner.py dispatches TrendMirrors by strategy type to build_trade_plan
 (legacy-path), and other strategies to generate_signals + exit_policy (new-path).
