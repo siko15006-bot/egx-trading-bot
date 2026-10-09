@@ -98,7 +98,8 @@ def test_future_indicator_metadata_is_not_exposed():
     class MetadataProbe(Probe):
         def generate_signals(self, data):
             if len(data) <= 21:
-                assert data.attrs.get("intraday") is False
+                assert "intraday" not in data.attrs
+                assert not data["Intraday_So_Far"].dropna().any()
                 assert "future_info" not in data.attrs
                 assert "Future_Close" not in data
             return super().generate_signals(data)

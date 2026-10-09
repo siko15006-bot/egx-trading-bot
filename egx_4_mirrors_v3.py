@@ -240,8 +240,14 @@ def _indicators(data: pd.DataFrame) -> pd.DataFrame:
     # على بيانات يومية (شمعة واحدة لكل يوم) الـVWAP اليومي = سعر الإغلاق بالظبط، فشرط "Close > VWAP_day" يبقى مستحيل.
     # بديل للمرآة على البيانات اليومية: VWAP متحرك لآخر 20 جلسة (مستقل عن طول الملف).
     data["VWAP_20"] = price_volume.rolling(20).sum() / volume.rolling(20).sum().replace(0, np.nan)
-    data.attrs["intraday"] = bool(cairo_days.duplicated().any())
-    data["VWAP_ref"] = data["VWAP_day"] if data.attrs["intraday"] else data["VWAP_20"]
+    # Once a Cairo date repeats among real bars, stay intraday forever. The
+    # first real bar uses VWAP_20 (NaN during warmup); the first repeated-date
+    # bar and all later real bars use VWAP_day, even after returning to daily.
+    intraday_so_far = pd.Series(cairo_days.duplicated(), index=data.index).cummax()
+    # Nullable boolean keeps prefix dtypes stable when future filler rows join.
+    data["Intraday_So_Far"] = intraday_so_far.astype("boolean")
+    data["VWAP_ref"] = data["VWAP_20"].where(~intraday_so_far, data["VWAP_day"])
+    data.attrs.pop("intraday", None)
     return data
 
 
