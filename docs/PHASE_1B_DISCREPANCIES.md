@@ -241,9 +241,25 @@ For every window w in W:
   whole history, including 2023 when the parallel market diverged; results
   covering 2023 state that caveat.
 - Not adopted: a USD benchmark (e.g. S&P 500) or a separate USD drawdown gate.
-  A "beat buy & hold" gate is also not adopted: the preserved draft reports
-  buy & hold as a criterion, not a gate; changing that needs Ahmed's explicit
-  decision before results.
+  A hard "beat buy & hold" gate is also not adopted (the preserved draft
+  reports buy & hold, it does not gate on it) -- see P1B-ACC-FX-2.
+
+## P1B-ACC-FX-2: buy & hold disclosure and justification threshold
+
+- Status: **resolved (Ahmed, 2026-10-11)**, before any acceptance run.
+- Every acceptance report shows buy & hold for the SAME basket (equal weight
+  of the strategy's eligible stocks), the SAME windows, the SAME starting
+  capital and the SAME fee model, in EGP and in USD (P1B-ACC-FX conversion).
+- Compared quantity: total net return of the strategy's capital over the
+  window vs total return of the buy & hold basket over the same window (not a
+  per-trade mean vs a window return, which are different units).
+- If the strategy's USD total return is lower than buy & hold's USD total
+  return by 20 percentage points or more, a written justification is required
+  before any paper/shadow stage. This is a mandatory stop for review, not an
+  automatic rejection.
+- Revisit as a hard gate once a strategy has passed the other criteria with a
+  larger sample; "the market" stays defined as above unless Ahmed changes it
+  before results.
 - Implementation/verification owner after authorization: **Codex/Claude**;
   FX source and caveats as in the data candidate manifest.
 
