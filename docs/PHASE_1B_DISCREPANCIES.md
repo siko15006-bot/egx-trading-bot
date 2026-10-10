@@ -253,10 +253,27 @@ For every window w in W:
 - Compared quantity: total net return of the strategy's capital over the
   window vs total return of the buy & hold basket over the same window (not a
   per-trade mean vs a window return, which are different units).
-- If the strategy's USD total return is lower than buy & hold's USD total
-  return by 20 percentage points or more, a written justification is required
-  before any paper/shadow stage. This is a mandatory stop for review, not an
-  automatic rejection.
+- Basket membership is point-in-time by validity: on each date only stocks
+  that have valid data on that date (after the candidate's valid_from cuts,
+  e.g. CIEB from 2021-03-01, BTFH from 2023-06-04, EFIH from 2021-10-20) are
+  in the equal-weight basket; an excluded stock is not replaced and its
+  weight is shared by the others. The strategy uses the same availability.
+  Both sides use the same price-return series (e.g. BTFH rights value is
+  absent for both), so the comparison stays like for like.
+- Trigger, exactly: `BH_USD_return - Strategy_USD_return >= 20 percentage
+  points` requires a written justification before any paper/shadow stage.
+  Outperformance never triggers it. This is a mandatory stop for review,
+  not an automatic rejection.
+- Minimum contents of that justification: sample size N, per-trade sigma and
+  the smallest edge detectable at that N; decomposition of the gap (timing,
+  stock selection, currency exposure); what result would change the
+  conclusion and the date of the next review.
+- Small samples cut both ways: with too few trades a strategy below buy & hold
+  is "not proven worse" and one above it is "not proven better". Either way
+  the decision is to stay in paper/shadow, never promotion to real money.
+  A minimum trade count for promotion (N_min_promotion from the measured
+  per-trade sigma and a stated minimum edge) is fixed in the strategy's own
+  pre-registration, before its results.
 - Revisit as a hard gate once a strategy has passed the other criteria with a
   larger sample; "the market" stays defined as above unless Ahmed changes it
   before results.
