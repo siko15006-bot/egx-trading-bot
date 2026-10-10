@@ -66,3 +66,43 @@ def test_cairo_day_not_utc_day_controls_mode():
     actual = assert_prefix_identity(raw)
     assert actual.Intraday_So_Far.tolist() == [False, True]
     assert actual.VWAP_ref.iloc[1] == actual.VWAP_day.iloc[1]
+
+
+def test_intraday_vwap_matches_hand_calculated_oracle():
+    raw = pd.DataFrame({
+        "Open": [100, 120, 80, 200], "High": [101, 121, 81, 201],
+        "Low": [99, 119, 79, 199], "Close": [100, 120, 80, 200],
+        "Volume": [1, 3, 2, 4],
+    }, index=pd.DatetimeIndex([
+        "2026-01-01 10:00Z", "2026-01-01 11:00Z",
+        "2026-01-01 12:00Z", "2026-01-02 10:00Z",
+    ]))
+    # Formula-derived constants, not engine snapshots: first bar has no window;
+    # (100*1+120*3)/4=115, (100+360+80*2)/6=310/3; next day resets.
+    expected = [np.nan, 115.0, 310 / 3, 200.0]
+    actual = eng.calculate_indicators(raw)
+    np.testing.assert_allclose(actual.VWAP_ref, expected, rtol=0, atol=1e-12, equal_nan=True)
+    for length in range(1, len(raw) + 1):
+        prefix = eng.calculate_indicators(raw.iloc[:length])
+        np.testing.assert_allclose(prefix.VWAP_ref, expected[:length],
+                                   rtol=0, atol=1e-12, equal_nan=True)
+
+
+def test_mixed_vwap_matches_hand_calculated_oracle():
+    daily = pd.date_range("2026-01-01 12:00", periods=20, tz="UTC")
+    index = daily.tolist() + [daily[-1] + pd.Timedelta(hours=1)]
+    index += pd.date_range("2026-01-21 12:00", periods=2, tz="UTC").tolist()
+    close = list(range(100, 120)) + [140, 150, 160]
+    raw = pd.DataFrame({"Open": close, "High": np.array(close) + 1,
+                        "Low": np.array(close) - 1, "Close": close,
+                        "Volume": [1] * 20 + [3, 2, 4]},
+                       index=pd.DatetimeIndex(index))
+    # Formula-derived constants, not engine snapshots: mean(100..119)=109.5.
+    # (119*1+140*3)/4=134.75. Sticky mode then resets by day to 150,160.
+    expected = [np.nan] * 19 + [109.5, 134.75, 150.0, 160.0]
+    actual = eng.calculate_indicators(raw)
+    np.testing.assert_allclose(actual.VWAP_ref, expected, rtol=0, atol=1e-12, equal_nan=True)
+    for length in range(1, len(raw) + 1):
+        prefix = eng.calculate_indicators(raw.iloc[:length])
+        np.testing.assert_allclose(prefix.VWAP_ref, expected[:length],
+                                   rtol=0, atol=1e-12, equal_nan=True)

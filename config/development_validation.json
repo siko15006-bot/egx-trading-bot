@@ -1,0 +1,64 @@
+{
+  "dataset": "data_2019_2026_wf",
+  "dividend_mode": "none",
+  "source_note": "Existing local CSVs only; original provider/licence and split adjustment not re-verified. No downloads.",
+  "windows": {
+    "first_test_start": "2025-07-01",
+    "train_months": 6,
+    "test_months": 3,
+    "count": 5,
+    "min_trades": 30
+  },
+  "risk": {
+    "capital": 100000,
+    "risk_pct": 0.01,
+    "atr_sl_mult": 1.5,
+    "reward_risk": 2.0,
+    "max_position_pct": 0.2,
+    "max_avg_volume_pct": 0.01
+  },
+  "scenarios": {
+    "net_assumption": {
+      "round_trip_fee_pct": null,
+      "capital_gains_tax_pct": 0.1,
+      "dividend_tax_pct": 0.1,
+      "slippage_bps": 10,
+      "fees": {
+        "brokerage_fixed_egp": 2,
+        "brokerage_variable_pct": 0.001,
+        "egx_pct": 0.0001,
+        "egx_max_egp": 5000,
+        "mcdr_pct": 0.0001,
+        "mcdr_max_egp": 5000,
+        "fra_pct": 0.00005,
+        "fra_min_egp": 1,
+        "fra_max_egp": 250,
+        "insurance_pct": 0.00005,
+        "insurance_max_egp": 5000,
+        "stamp_t0_pct": 0.00025,
+        "stamp_overnight_pct": 0.0005
+      }
+    },
+    "gross_zero_cost": {
+      "round_trip_fee_pct": 0,
+      "capital_gains_tax_pct": 0,
+      "dividend_tax_pct": 0,
+      "slippage_bps": 0,
+      "fees": {
+        "brokerage_fixed_egp": 0,
+        "brokerage_variable_pct": 0,
+        "egx_pct": 0,
+        "egx_max_egp": 0,
+        "mcdr_pct": 0,
+        "mcdr_max_egp": 0,
+        "fra_pct": 0,
+        "fra_min_egp": 0,
+        "fra_max_egp": 0,
+        "insurance_pct": 0,
+        "insurance_max_egp": 0,
+        "stamp_t0_pct": 0,
+        "stamp_overnight_pct": 0
+      }
+    }
+  }
+}

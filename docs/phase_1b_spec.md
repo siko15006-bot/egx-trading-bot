@@ -1,8 +1,14 @@
 # Phase 1b Spec (addendum to docs/PHASE_1B_PLAN.md @ b321f7a)
 
-Status: design only; implementation and validation have not started.
-This supplements PHASE_1B_PLAN.md. It supersedes conflicting design decisions
-in that plan, but does not change code or docs/execution_policy.md.
+Status: DEVELOPMENT / EXPERIMENTAL; not an acceptance specification.
+Acceptance authority remains Ahmed's approved draft. The exact file/version
+is pending confirmation; do not infer approval from this addendum or results.
+The scope and denominator decisions recorded in 78c952a are development
+assumptions only, not permission to relax acceptance requirements.
+This supplements PHASE_1B_PLAN.md for historical design context; it does not
+supersede the approved draft or change code or docs/execution_policy.md.
+Walk-forward and screening results remain development-only. TrendMirrors
+remains closed. No acceptance gate is passed or permanently retired here.
 
 ## Execution policy: preserve the existing model
 
@@ -118,7 +124,7 @@ trade for trade, including prices, timing, cancellation and costs.
   the agreed fixtures. Any deliberate model change requires separate review
   and impact analysis, not updated expected values presented as identity.
 
-## Decision 2: Monte Carlo denominator FROZEN, gate DISABLED
+## Decision 2: development Monte Carlo denominator, gate DISABLED
 
 Frozen before any run:
 
@@ -146,7 +152,8 @@ denominator or switch between max and p95 is permitted.
   the frozen concurrency definition below.
   Concurrency is informational, not resampled and not used in the denominator.
 
-Gate: p95 max DD <= 15% of NOTIONAL_DENOMINATOR. Status: DISABLED until this
+Experimental gate proposal: p95 max DD <= 15% of NOTIONAL_DENOMINATOR.
+Status: DISABLED, not passed and not permanently removed, until this
 data-source decision is committed, a baseline on data_2019_2026_wf/ is produced
 for a sanity check, and a separate explicit gate-enablement decision is recorded.
 Do not enable the gate from this spec alone. A non-binding baseline gate is
@@ -188,16 +195,19 @@ Capacity Violation uses B: max(B over the union date grid) > N_SLOTS (10).
 Report it separately as a boolean, independent of the disabled MC DD gate.
 A false value does not rule out capacity pressure during unknown break days.
 
-## Decision 3: data source FROZEN
+## Decision 3: development data snapshot, NOT acceptance-eligible
 
 - Dataset: data_2019_2026_wf/, 9 stocks. Eight begin 2019-07-02;
   EFIH begins 2021-10-20. All end 2026-10-01.
-- Regime verification is DEFERRED. No falling/choppy classifier is applied
-  or frozen for Phase 1b. Individual-stock drawdowns do not prove regime coverage.
+- Regime verification is DEFERRED for development only. Multi-regime coverage
+  remains required for acceptance; removal needs Ahmed's explicit approval.
+  No falling/choppy classifier is applied or frozen. Individual-stock
+  drawdowns do not prove regime coverage.
 - Every result carries: small-universe, partial-history, regimes-unverified.
-- Acceptance is explicitly RELAXED from regime-diverse validation to validation
-  on a small, partially-covered, regime-unverified dataset. Every results file
-  states this relaxation; a pass does NOT establish multi-regime robustness.
+- The acceptance relaxation written in 78c952a is reclassified as an
+  experimental development scope, not an approved acceptance rule. This
+  small, partially-covered, regime-unverified dataset cannot establish
+  acceptance or multi-regime robustness.
 - data/ remains rising-market-only smoke testing, ineligible for acceptance.
 - data_extended/ is unavailable and not planned for this Phase 1b scope.
 - EFIH enters no earlier than 2021-10-20. Cross-sectional counts use stocks
@@ -256,6 +266,11 @@ running. OOS windows do not overlap; training parameters never see test data.
 6. Report independent net and gross results, per window and overall.
 7. Retain the plan's parameter-neighbour stability requirement; this addendum
    does not remove it.
+8. Retain multi-regime validation. Unverified regime coverage cannot pass;
+   do not remove this requirement without Ahmed's explicit approval.
+9. Unresolved ADIB (2025-05-26), EAST (2024-06-02) and EFIH (2025-05-25)
+   saved-series discontinuities are not acceptance evidence. Independent
+   external verification and consistent field-adjustment policies are required.
 
 Expectancy = total P/L / trade count, equivalent to win probability times
 average win minus loss probability times absolute average loss. Report pooled
@@ -273,10 +288,12 @@ No deleted-trade arithmetic may be presented as a backtest counterfactual.
 - Amend PHASE_1B_PLAN.md with a pointer in a later approved documentation edit.
 - Implementation: not started. No code, defaults, data or execution policy changed.
 - Exit signature and multiplier payload: frozen in this design, not implemented.
-- Dataset choice and notional denominator: frozen; MC gate remains DISABLED.
+- Dataset choice and notional denominator: recorded development assumptions;
+  MC gate remains DISABLED, not passed or permanently retired.
 - Implementation and baseline execution are not authorized by this documentation
   commit. Record an explicit verified dividend mode; registry membership is optional.
 - Before implementation: freeze scheduled-exit edge cases and generic sizing.
 - Before baseline/acceptance runs: verify dividend mode, freeze windows,
-  bootstrap seed and concurrency measurement conventions. Regime verification
-  is deferred with the explicit acceptance relaxation above.
+  bootstrap seed and concurrency measurement conventions. Confirm the approved
+  draft's exact file/version and verify multi-regime coverage. There is no
+  acceptance relaxation or authorization to reopen TrendMirrors.

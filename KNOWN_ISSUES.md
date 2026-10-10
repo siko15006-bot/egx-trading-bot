@@ -237,6 +237,44 @@ identity. This does not resolve the legacy-versus-new-path trade-match debt.
 
 ## Phase 1b two-path debt
 
+### Acceptance scope and specification authority (2026-10-10)
+
+78c952a's data/denominator scope is DEVELOPMENT / EXPERIMENTAL, not an
+acceptance specification. Ahmed's approved draft remains authoritative;
+its exact file/version is pending confirmation. The MC gate remains
+DISABLED, not passed or permanently removed. Multi-regime validation remains
+required; removing it requires Ahmed's explicit approval. Current walk-forward
+and screening outputs remain development-only, with no strategy acceptance.
+TrendMirrors remains closed. See docs/phase_1b_spec.md.
+
+### P1B-DATA-QUALITY: saved-series discontinuities (OPEN)
+
+ADIB/2025-05-26, EAST/2024-06-02 and EFIH/2025-05-25 remain unresolved.
+Observed file discontinuities do not prove market moves, provider errors or
+price accuracy. Close/Adj Close adjustment policies and causes are unverified.
+These cases must not support acceptance before independent external-source
+verification. No data correction or new strategy run is authorized here.
+Evidence and resolution requirements: docs/data_quality_findings.md.
+
+### Local development walk-forward scope (2026-10-09)
+
+Approved scope is technical development on the existing 9 local stocks only.
+See docs/development_validation_scope.md and config/development_validation.json.
+Source/licence, split provenance, regime coverage, held-out data and execution
+feasibility remain unverified. No pass/fail or profitability claim is enabled.
+Window choices are fixed before this run: six-month indicator initialization,
+three-month tests, five adjacent windows from 2025-07-01. No fitting occurs.
+Indicators restart per window; training signals are disabled; positions start
+flat and use legacy END liquidation at the last observed test bar. These
+boundary conventions are development choices, not accepted market rules.
+Cost config copies existing assumptions, not verified historical tariffs.
+P1B-STOP-ANCHOR was closed by Ahmed on 2026-10-09 (reference decision only).
+Value-cap breach diagnostics cover completed
+raw executed notionals only: cancelled shares are absent from runner outputs.
+The wrapper intentionally uses the subclass fallback to gate training signals;
+prefix indicator recomputation remains a performance ceiling, not a new
+engine-math implementation. Optimize separately only after a frozen regression.
+
 ### Open items (updated 2026-10-09)
 
 Closing the optimization review does not resolve these items:
