@@ -233,7 +233,17 @@ For every window w in W:
   entry and exit converted to USD at the official rate of its own date, must
   also be > 0. Purpose: reject a strategy whose EGP edge is only exposure to
   EGP devaluation. Both numbers are reported with every result.
+- Conversion details (fixed now, before any run): source = Yahoo `EGP=X`
+  daily close (official rate), raw copy `outputs/fx_raw_20261010/EGP=X.csv`;
+  each fill converted at the rate of its own fill date (entry fill and exit
+  fill separately; fees in EGP converted at the fill date too); a date with no
+  FX quote uses the last earlier quote. The official rate is used for the
+  whole history, including 2023 when the parallel market diverged; results
+  covering 2023 state that caveat.
 - Not adopted: a USD benchmark (e.g. S&P 500) or a separate USD drawdown gate.
+  A "beat buy & hold" gate is also not adopted: the preserved draft reports
+  buy & hold as a criterion, not a gate; changing that needs Ahmed's explicit
+  decision before results.
 - Implementation/verification owner after authorization: **Codex/Claude**;
   FX source and caveats as in the data candidate manifest.
 

@@ -22,6 +22,19 @@ from paper_trading import (
 
 
 class PaperTradingTest(unittest.TestCase):
+    def test_weekly_boundary_is_cairo_sunday(self) -> None:
+        # Cairo is UTC+3: Sat 21:30 UTC is already Sunday 00:30 in Cairo, so it starts the next EGX week.
+        import pandas as pd
+        trades = pd.DataFrame({"exit_time": pd.to_datetime([
+            "2026-10-10T20:59:00Z",   # Sat 23:59 Cairo -> week of Sun 2026-10-04
+            "2026-10-10T21:30:00Z",   # Sun 00:30 Cairo -> week of Sun 2026-10-11
+        ], utc=True), "status": ["CLOSED", "CLOSED"], "pnl_egp": [1.0, 2.0], "pnl_pct": [0.1, 0.2],
+            "outcome": ["WIN", "WIN"], "r_multiple": [1.0, 1.0]})
+        old, _, old_start, _ = weekly_performance(trades, datetime(2026, 10, 10).date())
+        new, _, new_start, _ = weekly_performance(trades, datetime(2026, 10, 11).date())
+        self.assertEqual((str(old_start), list(old["pnl_egp"])), ("2026-10-04", [1.0]))
+        self.assertEqual((str(new_start), list(new["pnl_egp"])), ("2026-10-11", [2.0]))
+
     def test_trade_lifecycle_and_weekly_summary(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             db_path = Path(folder) / "paper.db"
