@@ -18,11 +18,9 @@ silently attributed to its original text.
   It does not override the acceptance draft.
 - `open`: an owner decision is pending. `deferred`: explicitly postponed by
   the owner. No item is silently deferred by this record.
-- `resolved` below means the policy or interpretation is settled, not that
+- `resolved` below means the policy, interpretation or metric is settled, not that
   code enforcement or verification has been completed. Both are stated
   separately; a resolved policy alone cannot establish acceptance.
-- `defined` means the owner has fixed a metric's mathematical meaning;
-  implementation and acceptance eligibility still require verification.
 - References to development-spec line numbers describe snapshot `3b9f43b`.
   Code references describe the unchanged implementation reviewed with it.
 
@@ -42,8 +40,10 @@ silently attributed to its original text.
   it is also not evidence of a live gate using the wrong denominator.
 - Decision owner: **Ahmed**, approved 2026-10-10. Defer because no
   acceptance-eligible dataset is currently available.
-- Reopening condition: review when acceptance-eligible data becomes available
-  and before any acceptance run. Shared-account implementation, verification
+- Reopening condition: review when acceptance-eligible data is registered
+  (`data_extended/` or an equivalent approved dataset) and before any
+  acceptance run. Registration alone does not establish data eligibility.
+  Shared-account implementation, verification
   and explicit gate-enablement authorization are required before evaluating
   the draft's p95 DD <= 15% criterion. The 1M yardstick is not a substitute.
 - Implementation/verification owner after authorization: **Codex**.
@@ -87,6 +87,16 @@ stop_mult   = (entry_price - stop_price) / atr
 target_mult = (target_price - entry_price) / atr
 ```
 
+Current generic multiplier resolution (not an inventory of past runs):
+
+| Level | Policy field | Default k when None | Explicit override |
+| --- | --- | --- | --- |
+| Stop | `stop_atr_mult` | 1.5 | Supplied finite positive multiplier |
+| Target | `target_atr_mult` | 3.0 | Supplied finite positive multiplier |
+
+An acceptance report must identify the resolved k values actually used;
+the default table does not imply every strategy or past run used them.
+
 The inverse is a mathematical conversion, not a new absolute-price API.
 It requires finite positive ATR and positive multipliers; the resolved stop
 must remain finite and positive. Field-level `None` selects defaults; a
@@ -116,14 +126,15 @@ does not add a no-stop mode, change legacy sizing, or permit future-bar ATR.
 
 ## P1B-ACC-EXIT: signal exits versus stop/target fills
 
-- Status: **resolved (interpretation)**.
+- Status: **resolved (Ahmed accepted Codex's interpretation on 2026-10-10)**;
+  implementation/verification pending.
 - Draft reference: `docs/phase_1b_acceptance.md:41`, the signal/max-hold timing
   rule, and the broader wording in acceptance criterion 5 at line 138.
 - Code reference: `egx_4_mirrors_v3.py:509` (`stop_fill`) and line 514
   (`target_fill`) implement level-touch fills and gap-bar Close fills.
   `validation/runner.py:134` rejects signal/max-hold policies with
   `NotImplementedError`; line 146 calls the existing trade simulator.
-- Audit trail: **Codex's interpretation, accepted by Ahmed on 2026-10-10**.
+- Audit trail: **Ahmed accepted Codex's interpretation on 2026-10-10**.
   This clarification is not quoted original wording from the preserved draft.
 - Resolved decision owner: **Ahmed**. Next-bar timing applies to an exit
   decision recognized at the signal bar's close, including max-hold intent.
@@ -139,7 +150,7 @@ does not add a no-stop mode, change legacy sizing, or permit future-bar ATR.
 
 ## P1B-ACC-EXPECTANCY: pooled net expectancy
 
-- Status: **defined (owner-approved)**; implementation/verification pending.
+- Status: **resolved (metric definition)**; implementation/verification pending.
 - Draft reference: `docs/phase_1b_acceptance.md:132`, acceptance criterion 3:
   `total net expectancy across W`, then removal of the single best window.
 - Development-spec reference: `docs/phase_1b_spec.md@3b9f43b:257` instead uses
@@ -168,7 +179,10 @@ pooled_net_expectancy = sum(net_PnL across eligible windows)
 
 ## P1B-ACC-ROBUST: leave-one-window-out robustness
 
-- Status: **open**.
+- Status: **resolved (LOO decision)**; `N_min` sub-condition **open**;
+  implementation/verification pending.
+- Audit trail: **Ahmed's addition on 2026-10-10**, not Codex's interpretation
+  or original wording from the preserved draft.
 - Draft reference: `docs/phase_1b_acceptance.md:130`, acceptance criterion 3,
   removes the single best window and requires the remaining result positive.
 - Development-spec reference: `docs/phase_1b_spec.md@3b9f43b:257` instead
@@ -177,17 +191,35 @@ pooled_net_expectancy = sum(net_PnL across eligible windows)
 - Code reference: `validation/development.py:201` disables acceptance
   pass/fail eligibility; no acceptance robustness decision is implemented
   in this path.
-- Decision owner: **Ahmed**. Define what a window means for this test:
-  a walk-forward OOS window, a calendar year, or another frozen time unit.
-  Define eligible units, best-window ranking, and whether to remove only
-  the best unit or require every leave-one-out result to pass.
-- Remaining criterion questions: must every remaining pooled mean be > 0?
-  Is a minimum remaining trade count `N` required, and if so what is `N`?
-  These are open questions, not adopted rules or permission to pick values
-  after observing results.
+- Decision owner: **Ahmed**, approved 2026-10-10. For the eligible
+  walk-forward OOS windows `W`, remove each window once and recompute the
+  pooled net expectancy over all remaining completed net trades:
+
+```text
+For every window w in W:
+    remaining = completed net trades from W excluding w
+    remaining_count = count(remaining)
+    remaining_mean = sum(net_PnL in remaining) / remaining_count
+    Require remaining_mean > 0 for every leave-one-out version.
+```
+
+- Window lengths, step and eligibility must be frozen in the validation
+  configuration before any acceptance run; this addition does not invent
+  a calendar-year regrouping or set those configuration values.
+- This is stronger than removing only the best window: every omission
+  includes omission of that window, without needing to rank windows.
+  The LOO rule is kept separate from the pooled expectancy definition.
+- Sub-condition: each remaining version must also have
+  `remaining_count >= N_min`. **N_min is OPEN**, to be set by Ahmed before
+  an acceptance run. The suggested value 20 was an example, not approved.
+  Do not choose N_min after observing results or silently omit this condition.
+- A zero-count remainder has undefined mean and cannot pass. While N_min
+  is unset, the full robustness criterion cannot be declared passed even
+  if all available leave-one-out means are positive.
 - Implementation/verification owner after authorization: **Codex**.
-- Acceptance consequence: robustness cannot be declared passed until the
-  definition, thresholds and implementation are fixed and verified.
+- Acceptance consequence: the LOO decision is settled, but robustness cannot
+  be declared passed until N_min, window configuration and implementation
+  are fixed and verified.
 
 ## Unchanged boundaries
 
