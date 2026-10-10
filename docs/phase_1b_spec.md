@@ -1,8 +1,10 @@
 # Phase 1b Spec (addendum to docs/PHASE_1B_PLAN.md @ b321f7a)
 
 Status: DEVELOPMENT / EXPERIMENTAL; not an acceptance specification.
-Acceptance authority remains Ahmed's approved draft. The exact file/version
-is pending confirmation; do not infer approval from this addendum or results.
+Acceptance authority remains [Ahmed's preserved 2026-10-08 draft](phase_1b_acceptance.md),
+committed verbatim. See [the discrepancy ledger](PHASE_1B_DISCREPANCIES.md)
+for unresolved decisions and implementation gaps. Do not infer acceptance
+compliance from preserving the draft, this addendum or development results.
 The scope and denominator decisions recorded in 78c952a are development
 assumptions only, not permission to relax acceptance requirements.
 This supplements PHASE_1B_PLAN.md for historical design context; it does not
@@ -295,5 +297,6 @@ No deleted-trade arithmetic may be presented as a backtest counterfactual.
 - Before implementation: freeze scheduled-exit edge cases and generic sizing.
 - Before baseline/acceptance runs: verify dividend mode, freeze windows,
   bootstrap seed and concurrency measurement conventions. Confirm the approved
-  draft's exact file/version and verify multi-regime coverage. There is no
-  acceptance relaxation or authorization to reopen TrendMirrors.
+  draft's unresolved decisions and implementation compliance, and verify
+  multi-regime coverage. There is no acceptance relaxation or authorization
+  to reopen TrendMirrors.

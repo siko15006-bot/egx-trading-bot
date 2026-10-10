@@ -240,8 +240,10 @@ identity. This does not resolve the legacy-versus-new-path trade-match debt.
 ### Acceptance scope and specification authority (2026-10-10)
 
 78c952a's data/denominator scope is DEVELOPMENT / EXPERIMENTAL, not an
-acceptance specification. Ahmed's approved draft remains authoritative;
-its exact file/version is pending confirmation. The MC gate remains
+acceptance specification. Ahmed's preserved 2026-10-08 draft is recorded in
+docs/phase_1b_acceptance.md; unresolved decisions and implementation gaps are
+tracked in docs/PHASE_1B_DISCREPANCIES.md. Resolved policy decisions do not
+establish implementation compliance. The MC gate remains
 DISABLED, not passed or permanently removed. Multi-regime validation remains
 required; removing it requires Ahmed's explicit approval. Current walk-forward
 and screening outputs remain development-only, with no strategy acceptance.
