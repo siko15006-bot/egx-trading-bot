@@ -231,8 +231,12 @@ only. Multi-regime acceptance requirements remain intact. `data_extended/`
 is not available. Candidate dataset (2026-10-10, Ahmed-approved build, local
 and gitignored): `outputs/yahoo_expansion_18_fixed_20261010/` with its own
 `manifest.json`. ADIB/EFIH/EAST/MFPC(2025-07-14)/SKPC(2024-10, 2026-01)/
-COMI(2025-12) breaks were Yahoo splits recorded 4-15 days late and never
-applied; fixed there by the Yahoo factor. MFPC 2024-01-02 is the ENPC merger
+COMI(2025-12) breaks are bonus-share (stock dividend) events: Yahoo dates
+them on about the official ex/reference date but back-adjusts only the last
+few sessions, leaving a false drop 4-15 days early and older history
+unadjusted; fixed there by the Yahoo factor. None is a cash dividend, and the
+engine only handles cash dividends (mode add/none), so nothing is adjusted
+twice; Adj Close/Close is flat around every event. MFPC 2024-01-02 is the ENPC merger
 share distribution (8.07476 new per old share, ex 2023-12-28), fixed by
 factor 9.07476. MASR 2026-02-22 is a treasury-share distribution (AGM
 2026-02-15), fixed by the Yahoo factor 1.0417. Residuals UNRESOLVED: EAST -5.8%
