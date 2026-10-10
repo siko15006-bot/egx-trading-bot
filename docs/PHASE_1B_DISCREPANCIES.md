@@ -179,7 +179,7 @@ pooled_net_expectancy = sum(net_PnL across eligible windows)
 
 ## P1B-ACC-ROBUST: leave-one-window-out robustness
 
-- Status: **resolved (LOO decision)**; `N_min` sub-condition **open**;
+- Status: **resolved (LOO decision, N_min, minimum window count)**;
   implementation/verification pending.
 - Audit trail: **Ahmed's addition on 2026-10-10**, not Codex's interpretation
   or original wording from the preserved draft.
@@ -209,24 +209,33 @@ For every window w in W:
 - This is stronger than removing only the best window: every omission
   includes omission of that window, without needing to rank windows.
   The LOO rule is kept separate from the pooled expectancy definition.
-- Sub-condition: each remaining version must also have
-  `remaining_count >= N_min`. **N_min is OPEN**, to be set by Ahmed before
-  an acceptance run. The suggested value 20 was an example, not approved.
-  Do not choose N_min after observing results or silently omit this condition.
-- A zero-count remainder has undefined mean and cannot pass. While N_min
-  is unset, the full robustness criterion cannot be declared passed even
-  if all available leave-one-out means are positive.
+- Sub-condition N_min (trades): **closed by Ahmed on 2026-10-10**, set
+  before any acceptance run. Draft criterion 2 already requires >= 30 OOS
+  trades in every eligible window, so with at least two eligible windows
+  every leave-one-out remainder has >= 30 trades. No separate N_min value
+  is added; the example value 20 is withdrawn.
+- Minimum eligible windows: **|W| >= 3, Ahmed on 2026-10-10**, set before
+  any acceptance run. With fewer than 3 eligible windows the robustness
+  criterion FAILS (it is not skipped or marked not-applicable). LOO always
+  runs over every eligible window, whatever their number.
+- A zero-count remainder has undefined mean and cannot pass.
 - Implementation/verification owner after authorization: **Codex**.
-- Acceptance consequence: the LOO decision is settled, but robustness cannot
-  be declared passed until N_min, window configuration and implementation
-  are fixed and verified.
+- Acceptance consequence: the robustness definition is fixed, but it cannot
+  be declared passed until window configuration and implementation are
+  fixed and verified.
 
 ## Unchanged boundaries
 
 MC stays disabled; all existing walk-forward/screen results are development
 only. Multi-regime acceptance requirements remain intact. `data_extended/`
-is not available; no data download or new data directory is authorized.
-ADIB/EAST/EFIH discontinuities remain unresolved pending independent source
-verification. The six local evidence files remain untracked and untouched.
+is not available. Candidate dataset (2026-10-10, Ahmed-approved build, local
+and gitignored): `outputs/yahoo_expansion_18_fixed_20261010/` with its own
+`manifest.json`. ADIB/EFIH/EAST/MFPC(2025-07-14) breaks were Yahoo splits
+recorded 4-15 days late and never applied; fixed there by factor. EAST keeps
+an UNRESOLVED -5.8% residual. CIEB rows through 2021-02-28, MFPC before
+2024-01-02 and BTFH before 2023-06-04 were removed (unverified causes).
+Regimes are measured in EGP and USD (Yahoo EGP=X, official rate). The
+candidate is NOT registered in `resolve_dividend_mode` and NOT
+acceptance-eligible until Ahmed reviews it. The six local evidence files remain untracked and untouched.
 TrendMirrors remains closed. No code, configuration or market data changes
 were made to resolve these discrepancies.
