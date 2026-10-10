@@ -230,10 +230,14 @@ MC stays disabled; all existing walk-forward/screen results are development
 only. Multi-regime acceptance requirements remain intact. `data_extended/`
 is not available. Candidate dataset (2026-10-10, Ahmed-approved build, local
 and gitignored): `outputs/yahoo_expansion_18_fixed_20261010/` with its own
-`manifest.json`. ADIB/EFIH/EAST/MFPC(2025-07-14) breaks were Yahoo splits
-recorded 4-15 days late and never applied; fixed there by factor. EAST keeps
-an UNRESOLVED -5.8% residual. CIEB rows through 2021-02-28, MFPC before
-2024-01-02 and BTFH before 2023-06-04 were removed (unverified causes).
+`manifest.json`. ADIB/EFIH/EAST/MFPC(2025-07-14)/SKPC(2024-10, 2026-01)/
+COMI(2025-12) breaks were Yahoo splits recorded 4-15 days late and never
+applied; fixed there by the Yahoo factor. MFPC 2024-01-02 is the ENPC merger
+share distribution (8.07476 new per old share, ex 2023-12-28), fixed by
+factor 9.07476. Residuals UNRESOLVED: EAST -5.8% (2024-06-02), MFPC +11.9%
+(2024-01-02); MASR 2026-03 possible split 1.0417 left unfixed (no source).
+CIEB rows through 2021-02-28 and BTFH before 2023-06-04 (cash rights issue,
+factor unverified) were removed.
 Regimes are measured in EGP and USD (Yahoo EGP=X, official rate). The
 candidate is NOT registered in `resolve_dividend_mode` and NOT
 acceptance-eligible until Ahmed reviews it. The six local evidence files remain untracked and untouched.
