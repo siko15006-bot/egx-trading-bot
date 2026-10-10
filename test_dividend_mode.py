@@ -48,7 +48,15 @@ def test_cli_refuses_double_count() -> None:
     assert run.returncode != 0 and "must be 'none'" in run.stderr
 
 
+def test_yahoo_expansion_candidate_registered_as_adjusted() -> None:
+    # Prices are Yahoo Adj Close based (dividend_mode none); adding dividends would double count.
+    folder = HERE / "outputs" / "yahoo_expansion_18_fixed_20261010"
+    assert resolve_dividend_mode(folder)[0] == "none"
+    assert "dividend mode must be 'none'" in _raises(str(folder), "add")
+
+
 if __name__ == "__main__":
     for fn in [f for n, f in dict(globals()).items() if n.startswith("test_")]:
         fn()
         print("PASS", fn.__name__)
+

@@ -231,8 +231,12 @@ only. Multi-regime acceptance requirements remain intact. `data_extended/`
 is not available. Candidate dataset (2026-10-10, Ahmed-approved build, local
 and gitignored): `outputs/yahoo_expansion_18_fixed_20261010/` with its own
 `manifest.json`. ADIB/EFIH/EAST/MFPC(2025-07-14)/SKPC(2024-10, 2026-01)/
-COMI(2025-12) breaks were Yahoo splits recorded 4-15 days late and never
-applied; fixed there by the Yahoo factor. MFPC 2024-01-02 is the ENPC merger
+COMI(2025-12) breaks are bonus-share (stock dividend) events: Yahoo dates
+them on about the official ex/reference date but back-adjusts only the last
+few sessions, leaving a false drop 4-15 days early and older history
+unadjusted; fixed there by the Yahoo factor. None is a cash dividend, and the
+engine only handles cash dividends (mode add/none), so nothing is adjusted
+twice; Adj Close/Close is flat around every event. MFPC 2024-01-02 is the ENPC merger
 share distribution (8.07476 new per old share, ex 2023-12-28), fixed by
 factor 9.07476. MASR 2026-02-22 is a treasury-share distribution (AGM
 2026-02-15), fixed by the Yahoo factor 1.0417. Residuals UNRESOLVED: EAST -5.8%
@@ -240,8 +244,15 @@ factor 9.07476. MASR 2026-02-22 is a treasury-share distribution (AGM
 the merger suspension; kept as a real repricing).
 CIEB rows through 2021-02-28 and BTFH before 2023-06-04 (cash rights issue,
 factor unverified) were removed.
-Regimes are measured in EGP and USD (Yahoo EGP=X, official rate). The
-candidate is NOT registered in `resolve_dividend_mode` and NOT
-acceptance-eligible until Ahmed reviews it. The six local evidence files remain untracked and untouched.
+Regimes are measured in EGP and USD (Yahoo EGP=X, official rate). Registered
+in `KNOWN_ADJUSTED_FOLDERS` (mode none) on 2026-10-11 by Ahmed's decision as a
+CANDIDATE only: registration fixes the dividend mode, it is NOT acceptance
+eligibility. Eligibility still needs a strategy whose rules are written before
+results and that passes every criterion here. Manifest also carries a gap
+register (Yahoo zero-volume filler rows); 3 of the 63 moves >15% follow a gap
+and span two sessions (ADIB 2021-08-10, EFIH 2024-05-02, ETEL 2020-01-30).
+Open issue (separate check): cash dividend amounts in docs/corporate_actions.csv
+appear adjusted by later bonus issues (COMI 2025-04-08: 2.273 = 2.5/1.1), which
+would understate dividends for mode "add" folders such as data/. The six local evidence files remain untracked and untouched.
 TrendMirrors remains closed. No code, configuration or market data changes
 were made to resolve these discrepancies.
