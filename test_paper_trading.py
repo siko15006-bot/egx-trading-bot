@@ -25,7 +25,9 @@ class PaperTradingTest(unittest.TestCase):
     def test_trade_lifecycle_and_weekly_summary(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             db_path = Path(folder) / "paper.db"
-            now = datetime.now(timezone.utc)
+            # Fixed Wednesday noon Cairo: the week is Cairo-based (Sun..Sat), so a wall-clock UTC date
+            # failed every Saturday 21:00-24:00 UTC (already Sunday in Cairo).
+            now = datetime(2026, 10, 7, 9, 0, tzinfo=timezone.utc)
             trade_id = add_paper_trade(
                 PaperTradeInput(
                     ticker="COMI",

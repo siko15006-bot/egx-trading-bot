@@ -224,6 +224,19 @@ For every window w in W:
   be declared passed until window configuration and implementation are
   fixed and verified.
 
+## P1B-ACC-FX: currency of acceptance
+
+- Status: **resolved (Ahmed, 2026-10-11)**, recorded before any acceptance run.
+- Ahmed works and accounts in EGP, so every acceptance criterion above stays
+  measured in EGP (primary gate).
+- Additional required check: the same pooled net expectancy, with each trade's
+  entry and exit converted to USD at the official rate of its own date, must
+  also be > 0. Purpose: reject a strategy whose EGP edge is only exposure to
+  EGP devaluation. Both numbers are reported with every result.
+- Not adopted: a USD benchmark (e.g. S&P 500) or a separate USD drawdown gate.
+- Implementation/verification owner after authorization: **Codex/Claude**;
+  FX source and caveats as in the data candidate manifest.
+
 ## Unchanged boundaries
 
 MC stays disabled; all existing walk-forward/screen results are development
