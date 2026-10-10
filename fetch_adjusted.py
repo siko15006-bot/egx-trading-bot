@@ -12,11 +12,13 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
+from data_downloader import apply_backadjust_fix, to_adjusted
+
 HERE = Path(__file__).parent
 OUT = HERE / "data_dividend_adjusted"
 ACTIONS_CSV = HERE / "docs" / "corporate_actions.csv"
 LOG = HERE / "docs" / "adjusted_download_log.json"
-SETTINGS = {"period": "2y", "interval": "1d", "auto_adjust": True, "actions": True}
+SETTINGS = {"period": "2y", "interval": "1d", "auto_adjust": False, "actions": True}  # adjusted after the split fix
 
 
 def fetch(ticker: str) -> pd.DataFrame:
@@ -27,7 +29,8 @@ def fetch(ticker: str) -> pd.DataFrame:
         raw.columns = raw.columns.get_level_values(0)
     raw.index = pd.to_datetime(raw.index).strftime("%Y-%m-%d")
     raw.index.name = "Date"
-    return raw[["Open", "High", "Low", "Close", "Volume", "Dividends", "Stock Splits"]]
+    cols = ["Open", "High", "Low", "Close", "Adj Close", "Volume", "Dividends", "Stock Splits"]
+    return to_adjusted(apply_backadjust_fix(raw[cols], ticker, OUT.name))
 
 
 def main() -> int:

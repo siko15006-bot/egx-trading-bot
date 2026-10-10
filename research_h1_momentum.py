@@ -24,21 +24,30 @@ SPLIT = "2023-01-01"
 
 def download() -> None:
     import yfinance as yf
+    from data_downloader import apply_backadjust_fix, to_adjusted
 
     manifest = json.loads((HERE / "egx_universe.json").read_text(encoding="utf-8"))
     tickers = sorted({r["ticker"] for r in manifest["records"]} | set(EXTRA))
     OUT.mkdir(exist_ok=True)
-    raw = yf.download(tickers, start="2019-01-01", auto_adjust=True, actions=False, group_by="ticker",
+    raw = yf.download(tickers, start="2019-01-01", auto_adjust=False, actions=True, group_by="ticker",
                       threads=True, progress=False, timeout=30)
-    saved = 0
+    saved, failed = 0, []
     for t in tickers:
-        frame = raw[t].dropna(how="all") if t in raw.columns.get_level_values(0) else pd.DataFrame()
-        if len(frame):
-            frame.index = pd.to_datetime(frame.index).strftime("%Y-%m-%d")
-            frame.index.name = "Date"
-            frame[["Open", "High", "Low", "Close", "Volume"]].to_csv(OUT / f"{t}.csv")
-            saved += 1
+        frame = raw[t].dropna(how="all", subset=["Close"]) if t in raw.columns.get_level_values(0) else pd.DataFrame()
+        if not len(frame):
+            continue
+        try:
+            frame = to_adjusted(apply_backadjust_fix(frame, t, OUT.name))  # fully adjusted, as before
+        except ValueError as exc:  # guard failed: keep the previous file, report it
+            failed.append(str(exc))
+            continue
+        frame.index = pd.to_datetime(frame.index).strftime("%Y-%m-%d")
+        frame.index.name = "Date"
+        frame[["Open", "High", "Low", "Close", "Volume"]].to_csv(OUT / f"{t}.csv")
+        saved += 1
     print(f"requested {len(tickers)}, saved {saved}, yfinance {yf.__version__}")
+    for line in failed:
+        print("NOT SAVED (back-adjust guard):", line)
 
 
 def load_panels(folder: Path = OUT) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
