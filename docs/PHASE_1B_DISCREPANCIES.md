@@ -234,8 +234,10 @@ and gitignored): `outputs/yahoo_expansion_18_fixed_20261010/` with its own
 COMI(2025-12) breaks were Yahoo splits recorded 4-15 days late and never
 applied; fixed there by the Yahoo factor. MFPC 2024-01-02 is the ENPC merger
 share distribution (8.07476 new per old share, ex 2023-12-28), fixed by
-factor 9.07476. Residuals UNRESOLVED: EAST -5.8% (2024-06-02), MFPC +11.9%
-(2024-01-02); MASR 2026-03 possible split 1.0417 left unfixed (no source).
+factor 9.07476. MASR 2026-02-22 is a treasury-share distribution (AGM
+2026-02-15), fixed by the Yahoo factor 1.0417. Residuals UNRESOLVED: EAST -5.8%
+(2024-06-02, low impact), MFPC +11.9% (2024-01-02, first valid session after
+the merger suspension; kept as a real repricing).
 CIEB rows through 2021-02-28 and BTFH before 2023-06-04 (cash rights issue,
 factor unverified) were removed.
 Regimes are measured in EGP and USD (Yahoo EGP=X, official rate). The
