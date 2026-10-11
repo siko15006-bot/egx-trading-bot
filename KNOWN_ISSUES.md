@@ -282,6 +282,18 @@ any trade across it (>25%), so no trade is affected; indicators around it are
 not reliable. Needs the corporate action from an external source, then a
 corporate_actions.csv row (or MANUAL_FALSE_DROPS entry).
 
+### P1B-DATA-UNRECORDED-SPLITS: drops no Yahoo split explains (OPEN, worklist)
+
+Deploy scan 2026-10-11 after the split fix (`outputs/backadjust_fix_20261011/scan_unrecorded_drops.py`, list in
+`unrecorded_drops_20261011.csv`): one-session drops > 10% since 2024 outside the 10 sessions before any known split.
+Every event the fix handled is gone (0 drops > 10% left before the 90 fixed events). Left:
+- `data/`, closes off the tick grid right after the drop (Yahoo divided them, no split recorded): **ADIB 2025-11-09
+  −10.9%**, **SVCE 2026-04-14 −12.2%** (both < 25%: data_breaks does not see them), AMES 2026-04-19 −48.7% (above).
+- `data_h3_live`, > 25% (data_breaks cancels trades; H3 excludes the stock for 252 sessions): OBRI 2024-02-19,
+  MPCI 2024-07-28, NIPH 2024-10-15 and 2025-08-10, ARAB 2025-03-09, ELSH 2025-06-24, OCDI 2025-08-17,
+  MCRO 2025-11-09, AIFI 2025-12-28, AMES 2026-04-19, **POUL 2026-09-28 −74.6%** (same day Yahoo moved EXPA/ORHD).
+Each needs the corporate action from an external source before any correction; until then they stay uncorrected.
+
 ### P1B-DATA-HEALTH-STRICTNESS: one stale ticker blocks the whole daily run (OPEN, review)
 
 assess_daily_data marks the run DATA_UNAVAILABLE if any expected ticker is not
