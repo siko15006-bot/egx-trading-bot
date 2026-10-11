@@ -65,9 +65,10 @@ Because the two core inputs are missing, **a faithful replication is INSUFFICIEN
 - **Execution:** state decided at close t, traded at close t+1 (documented "following trading day"). A filler bar (Volume 0)
   never fills: the trade waits for the next real bar.
 - **Portfolio (assumption W1):** 30 equal slots per half (1/30 of the value at the half start each). A slot is in the
-  stock when IN, in cash at 0% when OUT. All slots are closed at the last close of the half and the new half starts
-  from the portfolio value (a stock kept across halves is not traded twice: no cost if it stays IN through the boundary).
-- **Benchmark (paper's):** the same 30 slots always IN for the half (EW buy & hold per half-year).
+  stock when IN, in cash at 0% when OUT. All slots are closed (cost charged) at the last close of the half and the new
+  half starts OUT from the portfolio value (each half independent, as in the paper's procedure).
+- **Benchmark (paper's):** the same 30 slots, bought at the close of the first session of the half (next session after
+  the universe is chosen, like the strategies) and held to the last close (EW buy & hold per half-year).
 - **Costs (base):** 0.30% per side = Thndr fees ~0.18% (`fees_config.py`: 0.1% brokerage + EGX/MCDR/FRA/insurance + 0.05%
   stamp; the 2 EGP fixed fee ignored) + 0.12% slippage, rounded. Same cost on benchmark trades (half-start rebalance).
 - **Currency:** EGP primary; USD via `EGP=X` reported alongside.
@@ -106,3 +107,6 @@ Final report = replication verdict + proxy verdict per strategy. Prior related r
 ## Edit log
 
 - 2026-10-11: created before any download or return computation.
+- 2026-10-11 (still before any download): removed the contradictory clause "not traded twice across halves" (every
+  half starts OUT, so a position cannot stay IN through the boundary); benchmark buy timing fixed to the first
+  session's close. Found while writing the engine.
