@@ -9,6 +9,7 @@ import os
 import sqlite3
 import sys
 import time
+import tempfile
 from contextlib import closing
 from datetime import datetime
 from pathlib import Path
@@ -33,6 +34,7 @@ from data_health import DataHealthError, assess_daily_data, health_message
 from signal_engine import build_signals
 from validate_tv_signals import init_db
 import auto_sim
+from run_evidence import SafeFormatter, new_run_id, timestamps
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -47,7 +49,7 @@ def _resolve(path: str | os.PathLike[str]) -> Path:
 
 
 # يجهز تسجيل التشغيل اليومي إلى ملف والشاشة.
-def _configure_logging(log_path: Path) -> None:
+def _configure_logging(log_path: Path, run_id: str | None = None) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
@@ -55,6 +57,9 @@ def _configure_logging(log_path: Path) -> None:
         handlers=[logging.FileHandler(log_path, encoding="utf-8"), logging.StreamHandler()],
         force=True,
     )
+    for handler in logging.getLogger().handlers:
+        suffix = f" [run_id={run_id}]" if run_id else ""
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s" + suffix))
 
 
 # ينشئ جدول التقارير اليومية ويعيد رموز اليوم المسجلة سابقاً.
@@ -148,9 +153,9 @@ def _write_health(path: Path, report: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def _notify_once(report_date: str, message: str) -> str:
+def _notify_once(report_date: str, message: str, output_root: Path | None = None) -> str:
     # سجل الإرسال منفصل عن التقرير؛ الإرسال الفاشل لا يستهلك محاولة اليوم.
-    path = BASE_DIR / "logs" / f"daily_delivery_{report_date}.json"
+    path = (output_root or BASE_DIR) / "logs" / f"daily_delivery_{report_date}.json"
     sent = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
     key = hashlib.sha256(message.encode("utf-8")).hexdigest()
     if key in sent:
@@ -185,8 +190,7 @@ def _already_succeeded(db_path: Path, report_date: str) -> bool:
 
 # يقرأ كل ملفات CSV المتاحة دون فشل عند المجلد الفارغ.
 def _load_universe(data_folder: Path) -> dict[str, pd.DataFrame]:
-    data_folder.mkdir(parents=True, exist_ok=True)
-    if not any(data_folder.glob("*.csv")):
+    if not data_folder.is_dir() or not any(data_folder.glob("*.csv")):
         LOGGER.warning("No CSV files found in %s", data_folder)
         return {}
     return filter_universe(load_data_map(data_folder))
@@ -197,30 +201,63 @@ def run_daily(args: argparse.Namespace) -> int:
     started = time.monotonic()
     now = _now()
     report_date = now.strftime("%Y%m%d")
+    run_id = new_run_id()
+    output_arg = getattr(args, "output_root", None)
+    isolated = bool(output_arg) or args.dry_run
+    output_root = _resolve(output_arg).resolve() if output_arg else (
+        Path(tempfile.mkdtemp(prefix="egx-dry-run-")) if args.dry_run else BASE_DIR.resolve())
+
+    def output_path(value):
+        path = Path(value)
+        path = (path if path.is_absolute() else output_root / path).resolve()
+        if isolated and (BASE_DIR.resolve().is_relative_to(output_root) or not path.is_relative_to(output_root)):
+            raise ValueError("Isolated output paths must stay inside a separate --output-root")
+        return path
+
     data_folder = _resolve(args.data_folder)
-    db_path = _resolve(args.db_path)
+    if args.download and isolated:
+        data_folder = output_path(args.data_folder)
+    # A dry-run must not inherit a production DB_PATH from .env or its parent process.
+    db_path = output_path("egx_signals.db" if isolated else args.db_path)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
     os.environ["DB_PATH"] = str(db_path)
     os.environ["DATA_FOLDER"] = str(data_folder)
-    _configure_logging(BASE_DIR / "logs" / f"daily_{report_date}.log")
-    LOGGER.info("EGX daily run started")
+    _configure_logging(output_root / "logs" / f"daily_{report_date}.log", run_id)
+    run_dir = output_root / "logs" / "runs" / run_id
+    health_path = output_path(getattr(args, "health_file", "logs/bot_health_latest.json"))
+    health: dict[str, Any] = {"status": "RUNNING", "download_status": "not_requested",
+                              "analysis_completed": False, "report_created": False,
+                              "report_stored": False, "delivery_kind": None}
+
+    def record_health(*, latest=True):
+        content = {**health, "run_id": run_id, "mode": "isolated" if isolated else "production", **timestamps()}
+        _write_health(run_dir / f"health_{report_date}.json", content)
+        if latest:
+            _write_health(health_path, content)
+
+    LOGGER.info("EGX daily run started: run_id=%s mode=%s output_root=%s", run_id,
+                "isolated" if isolated else "production", output_root)
     alert_after = getattr(args, "alert_after", None)  # None = old behaviour: alert on every failed run
     if alert_after is not None and not args.dry_run and _already_succeeded(db_path, report_date):
         LOGGER.info("Retry skipped: daily report for %s already stored", report_date)
+        health["status"] = "SKIPPED_ALREADY_STORED"
+        record_health(latest=False)
         return 0
-    health_path = _resolve(getattr(args, "health_file", "logs/bot_health_latest.json"))
-    health: dict[str, Any] = {"status": "RUNNING"}
-    _write_health(health_path, health)
+    record_health()
 
     try:
         if args.download:
             try:
-                downloads = download_universe(data_folder)
+                downloads = download_universe(data_folder, evidence_dir=run_dir / "downloads")
+                health.update(download_status="responses_accepted", download_accepted=len(downloads))
                 LOGGER.info("Download responses accepted for %d tickers; validating complete universe", len(downloads))
             except Exception:
+                health["download_status"] = "failed"
                 LOGGER.exception("Market data download failed; cached files must pass freshness validation")
         data_map = _load_universe(data_folder)
-        data_map, health = assess_daily_data(data_map, expected_tickers=UNIVERSE)
-        _write_health(health_path, health)
+        data_map, assessed = assess_daily_data(data_map, expected_tickers=UNIVERSE)
+        health.update(assessed)
+        record_health()
         LOGGER.info("Data health: status=%s expected=%s latest=%s fresh=%s/%s",
                     health["status"], health["expected_session"], health["latest_session"], health["fresh"], health["required"])
         if health.get("suspect_volume"):
@@ -239,6 +276,7 @@ def run_daily(args: argparse.Namespace) -> int:
             RiskConfig(capital=args.capital),
         )
         unified = build_signals(data_map, SignalConfig(), RiskConfig(capital=args.capital))
+        health["analysis_completed"] = True
         health["scanner_status_counts"] = signals["Status"].value_counts().to_dict() if not signals.empty else {}
         LOGGER.info("Unified signals: BUY=%d WATCH=%d SELL=%d; as_of=%s",
                     len(unified.buy), len(unified.watch), len(unified.sell), unified.as_of)
@@ -262,15 +300,19 @@ def run_daily(args: argparse.Namespace) -> int:
         buy_tickers = sorted(signals.loc[signals["Status"] == "BUY", "Ticker"].astype(str).tolist()) if not signals.empty else []
         previous = set() if args.dry_run else _reported_tickers(db_path, report_date)   # _reported_tickers بيعمل CREATE + commit
         new_tickers = sorted(set(buy_tickers) - previous)
-        report_path = BASE_DIR / "reports" / f"daily_{report_date}.xlsx"
+        report_path = output_root / "reports" / f"daily_{report_date}.xlsx"
         export_analytics_report(report_path)   # ملف Excel محلي (قراءة من DB بس) — بيتولد في dry-run كمان
+        health["report_created"] = True
         if not args.dry_run:
-            if args.notify and not args.no_telegram:
+            if args.notify and not args.no_telegram and not isolated:
                 health["telegram_delivery"] = _notify_once(
                     report_date, _daily_message(now.strftime("%Y-%m-%d"), new_tickers, stats,
                                                 as_of=unified.as_of, buy_count=len(unified.buy), watch_count=len(unified.watch)) + auto_line,
+                    output_root,
                 )
+                health["delivery_kind"] = "report"
             _store_report(db_path, report_date, report_path, buy_tickers, stats, patterns)
+            health["report_stored"] = True
         else:
             LOGGER.info("Dry run: database summary and Telegram send skipped (report written: %s)", report_path)
 
@@ -282,7 +324,7 @@ def run_daily(args: argparse.Namespace) -> int:
             time.monotonic() - started,
         )
         health.update(status="SUCCESS", buy=len(unified.buy), watch=len(unified.watch))
-        _write_health(health_path, health)
+        record_health()
         return 0
     except DataHealthError as exc:
         LOGGER.error("Analysis blocked by data health: %s", exc.report)
@@ -294,19 +336,20 @@ def run_daily(args: argparse.Namespace) -> int:
             else:
                 LOGGER.warning("Data not fresh yet; Telegram alert deferred until the %s retry", alert_after.strftime("%H:%M"))
         try:
-            if final_attempt and args.notify and not args.no_telegram and not args.dry_run:
+            if final_attempt and args.notify and not args.no_telegram and not args.dry_run and not isolated:
                 health["telegram_delivery"] = _notify_once(
-                    report_date, f"EGX bot health - {now:%Y-%m-%d}\n{health_message(exc.report)}",
+                    report_date, f"EGX bot health - {now:%Y-%m-%d}\n{health_message(exc.report)}", output_root,
                 )
+                health["delivery_kind"] = "failure_alert"
         except Exception:
             LOGGER.exception("Data-health Telegram alert delivery failed")
             health["telegram_delivery"] = "failed"
-        _write_health(health_path, health)
+        record_health()
         return 2
     except Exception:
         LOGGER.exception("EGX daily run failed after %.2fs", time.monotonic() - started)
         health["status"] = "RUN_ERROR"
-        _write_health(health_path, health)
+        record_health()
         return 1
 
 
@@ -323,6 +366,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--health-only", action="store_true", help="Validate completed daily data without DB/report writes")
     parser.add_argument("--health-file", default="logs/bot_health_latest.json")
+    parser.add_argument("--output-root", help="Separate root for logs, evidence, reports and DB; dry-runs default to a temp root")
     parser.add_argument("--alert-after", type=lambda s: datetime.strptime(s, "%H:%M").time(), default=None,
                         help="Retry mode (HH:MM, Cairo): skip if today's report exists; send the data-health alert only from this time")
     return parser.parse_args()

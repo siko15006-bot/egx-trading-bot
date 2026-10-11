@@ -301,3 +301,23 @@ candidate is NOT registered in `resolve_dividend_mode` and NOT
 acceptance-eligible until Ahmed reviews it. The six local evidence files remain untracked and untouched.
 TrendMirrors remains closed. No code, configuration or market data changes
 were made to resolve these discrepancies.
+
+## Operational monitoring versus live readiness (Ahmed, 2026-10-11)
+
+These are separate operational prerequisites, not strategy-acceptance gates.
+The approved criteria do not authorize promotion or reopening TrendMirrors.
+
+- **P1B-OPS-MONITOR:** five consecutive trading sessions with correct documented
+  status, no false success or holiday alert, and isolated test evidence.
+  Correctly reporting delayed data can satisfy monitoring.
+- **P1B-OPS-READY:** five consecutive trading sessions with fresh data within the
+  agreed deadline, completed analysis, stored report and confirmed report delivery.
+  A delivered failure alert is not report delivery. The operational deadline must
+  be recorded before counting sessions; this branch does not extend the retry window.
+- Implementation owner for this work: **Codex in the current execution session**;
+  calendar approval owner: **Ahmed**. Deployment and five-session verification
+  remain pending. Calendar libraries only propose dates; EGX announcements decide.
+- D2/D7/D14/D21 start after deployed, verified isolated evidence capture, not the
+  discussion date. See `docs/isolated_logging.md` for the bounded MVP and checks.
+- The adjustment branch requires independent review before any combined release.
+  October 13-14 is a target, not an unattended deployment commitment.

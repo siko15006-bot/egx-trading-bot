@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import tempfile
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -20,7 +21,8 @@ import egx_4_mirrors_v3 as eng  # noqa: E402
 import pattern_detector as pdx  # noqa: E402
 from setup_builder import build_setup, build_setups  # noqa: E402
 
-LOG = HERE / "logs" / f"setup_cards_{datetime.now():%Y%m%d}.log"
+TEST_ROOT = Path(tempfile.mkdtemp(prefix="egx-setups-test-"))
+LOG = TEST_ROOT / f"setup_cards_{datetime.now():%Y%m%d}.log"
 results: list[tuple[str, bool, str]] = []
 
 
@@ -209,7 +211,7 @@ def main() -> int:
 
     passed = sum(ok for _, ok, _ in results)
     print(f"\nRESULT {passed}/{len(results)} passed")
-    (HERE / "logs" / "setup_cards_test_results.json").write_text(
+    (TEST_ROOT / "setup_cards_test_results.json").write_text(
         json.dumps([{"test": n, "pass": ok, "detail": d} for n, ok, d in results], ensure_ascii=False, indent=2), encoding="utf-8")
     return 0 if passed == len(results) else 1
 

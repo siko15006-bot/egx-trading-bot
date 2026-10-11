@@ -27,7 +27,8 @@ import pandas as pd  # noqa: E402
 import egx_4_mirrors_v3 as eng  # noqa: E402
 import validate_tv_signals as tv  # noqa: E402
 
-LOG = HERE / "logs" / f"closure_test_{datetime.now():%Y%m%d}.log"
+TEST_ROOT = Path(tempfile.mkdtemp(prefix="egx-closure-"))
+LOG = TEST_ROOT / f"closure_test_{datetime.now():%Y%m%d}.log"
 REAL_DB = HERE / "egx_signals.db"
 results: list[tuple[str, bool, str]] = []
 CLEAN_ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "TELEGRAM_BOT_TOKEN": "", "TELEGRAM_CHAT_ID": ""}
@@ -50,7 +51,7 @@ def db_snapshot(path: Path) -> tuple[str, dict[str, int]]:
 
 def daily_runner_tests() -> None:
     today = datetime.now(ZoneInfo("Africa/Cairo")).strftime("%Y%m%d")
-    report, log_file = HERE / "reports" / f"daily_{today}.xlsx", HERE / "logs" / f"daily_{today}.log"
+    report, log_file = TEST_ROOT / "reports" / f"daily_{today}.xlsx", TEST_ROOT / "logs" / f"daily_{today}.log"
     before = db_snapshot(REAL_DB)
     with tempfile.TemporaryDirectory() as empty:
         # The session is pinned to the folder's own last candle (EGX_EXPECTED_SESSION), so the result does not depend on
@@ -62,7 +63,7 @@ def daily_runner_tests() -> None:
             start = time.time()
             log_size = log_file.stat().st_size if log_file.exists() else 0
             proc = subprocess.run([sys.executable, "-W", "ignore", "daily_runner.py", "--data-folder", folder, "--capital", "100000",
-                                   "--no-telegram", "--dry-run"], cwd=HERE, env={**CLEAN_ENV, "EGX_EXPECTED_SESSION": last},
+                                   "--no-telegram", "--dry-run", "--output-root", str(TEST_ROOT)], cwd=HERE, env={**CLEAN_ENV, "EGX_EXPECTED_SESSION": last},
                                   capture_output=True, text=True, encoding="utf-8", timeout=900)
             # slice bytes, not text: read_text turns CRLF into LF, so a byte offset would skip the new lines on Windows
             new_log = log_file.read_bytes()[log_size:].decode("utf-8", errors="replace") if log_file.exists() else ""

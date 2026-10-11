@@ -14,6 +14,7 @@ import pandas as pd
 import yfinance as yf
 from egx_lists import UNIVERSE
 from data_health import require_daily_data
+from run_evidence import SafeFormatter, capture_download, new_run_id
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -49,6 +50,8 @@ def _configure_logging() -> Path:
         handlers=[logging.FileHandler(log_path, encoding="utf-8"), logging.StreamHandler()],
         force=True,
     )
+    for handler in logging.getLogger().handlers:
+        handler.setFormatter(SafeFormatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     return log_path
 
 
@@ -99,12 +102,26 @@ def download_ticker(
     data_folder: str | os.PathLike[str],
     limit: int = 250,
     period: str = "2y",
+    evidence_dir: Path | None = None,
 ) -> DownloadResult:
     folder = _resolve(data_folder)
     folder.mkdir(parents=True, exist_ok=True)
     symbol = ticker.strip().upper()
-    raw = yf.download(
-        symbol,
+    if not symbol or any(c not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.^=-" for c in symbol):
+        raise ValueError("Invalid ticker")
+    evidence_dir = evidence_dir or folder / ".evidence" / new_run_id() / "downloads"
+
+    def request(number, **kwargs):
+        try:
+            raw = yf.download(symbol, **kwargs)
+        except Exception as exc:
+            capture_download(evidence_dir, symbol, number, None, exc)
+            raise
+        capture_download(evidence_dir, symbol, number, raw)
+        return raw
+
+    raw = request(
+        1,
         period=period,
         interval="1d",
         auto_adjust=False,
@@ -119,8 +136,8 @@ def download_ticker(
         if period != "2y":
             raise
         today = datetime.now(CAIRO_TZ).date()
-        raw = yf.download(
-            symbol,
+        raw = request(
+            2,
             start=today - timedelta(days=740),
             end=today + timedelta(days=1),
             interval="1d",
@@ -182,13 +199,15 @@ def download_universe(
     tickers: tuple[str, ...] = UNIVERSE,
     limit: int = 250,
     period: str = "2y",
+    evidence_dir: Path | None = None,
 ) -> list[DownloadResult]:
     folder = _resolve(data_folder)
+    evidence_dir = evidence_dir or folder / ".evidence" / new_run_id() / "downloads"
     results: list[DownloadResult] = []
     failures: list[str] = []
     for number, ticker in enumerate(tickers, 1):
         try:
-            results.append(download_ticker(ticker, folder, limit=limit, period=period))
+            results.append(download_ticker(ticker, folder, limit=limit, period=period, evidence_dir=evidence_dir))
         except Exception as exc:
             fallback = folder / f"{ticker}.csv"
             failures.append(ticker)

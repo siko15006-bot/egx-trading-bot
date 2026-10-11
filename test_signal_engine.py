@@ -20,7 +20,7 @@ import telegram_notifier  # noqa: E402
 from data_health import expected_session
 
 eng = se.eng
-LOG = HERE / "logs" / f"signals_test_{datetime.now():%Y%m%d}.log"
+LOG = Path(tempfile.mkdtemp(prefix="egx-signals-test-")) / f"signals_test_{datetime.now():%Y%m%d}.log"
 results: list[tuple[str, bool, str]] = []
 SIG, RISK = eng.SignalConfig(), eng.RiskConfig()
 ALL_MIRRORS = {"signal": "BUY", "mirrors": {"Trend": True, "Momentum": True, "Volume": True, "Volatility": True}}
