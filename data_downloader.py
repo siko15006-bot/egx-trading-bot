@@ -32,7 +32,9 @@ PRICE_COLS = ("Open", "High", "Low", "Close", "Adj Close")
 RAW_ARCHIVE = BASE_DIR / "backups" / "yahoo_raw"
 # Approved false drops the detector cannot see (factor < 7%, divided closes on the grid): (ticker, Yahoo split date) ->
 # false-drop day. Applied only while that day still drops by about the factor, so a later full Yahoo fix is not doubled.
-MANUAL_FALSE_DROPS = {("MASR.CA", "2026-03-04"): "2026-02-22"}  # treasury-share distribution, Ahmed 2026-10-11
+# Empty: an entry needs the false-drop day itself verified against an independent price source (Ahmed 2026-10-11).
+# MASR 2026-03-04 (x1.0417) stays UNKNOWN: event and ex-date confirmed, Yahoo's divided block start is not (KNOWN_ISSUES).
+MANUAL_FALSE_DROPS: dict[tuple[str, str], str] = {}
 TRUSTED = ("fingerprint", "none: window already on the new basis (fully adjusted)")  # tick-grid verdicts
 FIX_LOG = BASE_DIR / "logs" / "backadjust_fixes.jsonl"
 

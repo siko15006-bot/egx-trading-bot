@@ -92,7 +92,10 @@ Found 2026-10-06 on COMI, checked against Yahoo directly.
   is found by the tick grid (Yahoo's divided closes are off the 0.001 EGP grid) or, for factors ≥ 7% only, by the
   drop closest to the factor; everything before it is divided by the factor. A drop still factor-sized afterwards and
   not confirmed by the grid rejects that ticker's download (old file kept). Factors < 7% without a grid signal are
-  left alone unless listed in `MANUAL_FALSE_DROPS` (MASR 2026-02-22). Not covered: corporate actions Yahoo does not
+  left alone unless listed in `MANUAL_FALSE_DROPS` (empty). **MASR 2026-03-04 is UNKNOWN**: treasury-share
+  distribution 0.0417/share, AGM 2026-02-15, right to the close of 2026-03-03 (almalnews, Mubasher via search,
+  2026-10-11), so Yahoo's ex-date and factor are right; but where Yahoo's divided block starts (2026-02-22 −3.6% or
+  2026-02-25 −4.8%) needs independent closes for 02-19..03-03 — until then `data/` before it is ~4% high. Not covered: corporate actions Yahoo does not
   record as a split (MFPC 2024-01-02 merger shares) — `data_breaks` still cancels those.
 - Rules: execution levels (Entry/SL/TP) from `data/`; returns/PnL from fully adjusted prices (or `data/` + dividends);
   never combine both folders in one calculation; any new download must state `auto_adjust`/`actions` here.
