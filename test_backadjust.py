@@ -166,3 +166,14 @@ def test_rejected_ticker_blocks_the_daily_scan():
                                       expected_tickers=["OK.CA", "REJ.CA"])
     assert "REJ.CA" not in valid and "REJ.CA" in report["problems"]
     assert report["status"] == "DATA_UNAVAILABLE"
+
+
+def test_fetch_adjusted_fixes_with_real_dates(tmp_path, monkeypatch):
+    """fetch_adjusted.fetch once turned dates into text before the fix: every ticker with a split failed (2026-10-11)."""
+    import fetch_adjusted as fa
+    monkeypatch.setattr(dd, "RAW_ARCHIVE", tmp_path / "raw")
+    monkeypatch.setattr(dd, "FIX_LOG", tmp_path / "fix.jsonl")
+    monkeypatch.setattr(fa.yf, "download", lambda *a, **k: _simple())
+    frame = fa.fetch("SKPC.CA")
+    assert np.allclose(frame["Close"], 80.0) and frame.index[0] == str(_simple().index[0].date())
+    assert list(frame.columns) == ["Open", "High", "Low", "Close", "Volume", "Dividends", "Stock Splits"]

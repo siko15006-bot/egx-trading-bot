@@ -27,10 +27,12 @@ def fetch(ticker: str) -> pd.DataFrame:
         raise ValueError("empty download")
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = raw.columns.get_level_values(0)
-    raw.index = pd.to_datetime(raw.index).strftime("%Y-%m-%d")
-    raw.index.name = "Date"
+    raw.index = pd.to_datetime(raw.index)  # real dates for the fix; text only after it
     cols = ["Open", "High", "Low", "Close", "Adj Close", "Volume", "Dividends", "Stock Splits"]
-    return to_adjusted(apply_backadjust_fix(raw[cols], ticker, OUT.name))
+    frame = to_adjusted(apply_backadjust_fix(raw[cols], ticker, OUT.name))
+    frame.index = frame.index.strftime("%Y-%m-%d")
+    frame.index.name = "Date"
+    return frame
 
 
 def main() -> int:
