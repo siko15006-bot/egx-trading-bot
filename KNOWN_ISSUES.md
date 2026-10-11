@@ -269,6 +269,25 @@ These cases must not support acceptance before independent external-source
 verification. No data correction or new strategy run is authorized here.
 Evidence and resolution requirements: docs/data_quality_findings.md.
 
+### P1B-DATA-AMES-20260419: unrecorded split in AMES (OPEN, low impact)
+
+AMES.CA drops -48.7% on 2026-04-19 (53.00 -> 27.1696). The new close is off the
+0.001 EGP tick grid, i.e. a price Yahoo divided, but neither Yahoo's Stock Splits
+nor docs/corporate_actions.csv has an event for it, so the split fix cannot see
+it (seen in the 2026-10-11 dry-run download with the fix). data_breaks cancels
+any trade across it (>25%), so no trade is affected; indicators around it are
+not reliable. Needs the corporate action from an external source, then a
+corporate_actions.csv row (or MANUAL_FALSE_DROPS entry).
+
+### P1B-DATA-HEALTH-STRICTNESS: one stale ticker blocks the whole daily run (OPEN, review)
+
+assess_daily_data marks the run DATA_UNAVAILABLE if any expected ticker is not
+fresh, and daily_runner raises before scan_universe. A split-fix guard rejection
+keeps the previous (stale) CSV, so one rejected ticker stops the daily report
+for every ticker until resolved (test_rejected_ticker_blocks_the_daily_scan).
+Safe (no signal on suspect data) but strict. Open question for Ahmed: allow a
+partial run that excludes rejected tickers with a warning, or keep refusing.
+
 ### Local development walk-forward scope (2026-10-09)
 
 Approved scope is technical development on the existing 9 local stocks only.
