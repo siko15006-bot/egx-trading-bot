@@ -105,6 +105,8 @@ def test_guard_failure_keeps_the_old_file(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="false split drop left after fix"):
         dd.download_ticker("SKPC.CA", tmp_path / "data")
     assert not (tmp_path / "data" / "SKPC.CA.csv").exists()
+    rejected = [json.loads(line) for line in (tmp_path / "fix.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert any(r.get("reason") == "suspected_false_drop" and r["ticker"] == "SKPC.CA" for r in rejected)
 
 
 def _flagged(folder: Path, tol: float, trusted=frozenset()) -> set[tuple[str, str]]:

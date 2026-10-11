@@ -166,6 +166,24 @@ def false_split_drops(df: pd.DataFrame, splits: pd.Series, tol: float = FIX_TOL,
     return found
 
 
+def _guard_alert(ticker: str, source: str, bad: list) -> None:
+    """A rejection keeps the previous file, which may hold the false drop: log it and tell Telegram on every
+    rejected download (so it repeats daily until fixed). Never breaks the download itself."""
+    now = datetime.now(CAIRO_TZ)
+    try:
+        FIX_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with FIX_LOG.open("a", encoding="utf-8") as log:
+            log.write(json.dumps(dict(at=now.isoformat(timespec="seconds"), source=source, ticker=ticker,
+                                      reason="suspected_false_drop", rejected=bad), ensure_ascii=False) + "\n")
+        if "PYTEST_CURRENT_TEST" in os.environ:  # ponytail: tests never message the live chat
+            return
+        from telegram_notifier import send_telegram
+        send_telegram(f"⚠️ Fix guard rejected {ticker} ({source}) on {now:%Y-%m-%d}: false split drop still present "
+                      f"{bad}. Old file kept (may contain the false drop). Manual review required.")
+    except Exception as exc:  # the alert must not hide the rejection
+        LOGGER.error("Guard alert for %s failed: %s", ticker, exc)
+
+
 def apply_backadjust_fix(raw: pd.DataFrame, ticker: str, source: str) -> pd.DataFrame:
     """Download hook (raw = auto_adjust=False frame with Stock Splits): archive Yahoo's response when it has a split,
     fix, log, then the guard. Tick-grid verdicts are trusted (a factor-sized drop left beside them is a real move);
@@ -190,6 +208,7 @@ def apply_backadjust_fix(raw: pd.DataFrame, ticker: str, source: str) -> pd.Data
     trusted = frozenset(pd.Timestamp(n["split_date"]) for n in notes if n["method"] in TRUSTED)
     bad = false_split_drops(fixed, splits.rename(index=pd.Timestamp), skip=trusted)
     if bad:
+        _guard_alert(ticker, source, bad)
         raise ValueError(f"{ticker}: false split drop left after fix (split, factor, day, ratio): {bad}")
     return fixed
 
