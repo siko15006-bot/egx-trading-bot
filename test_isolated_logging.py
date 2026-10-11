@@ -8,7 +8,8 @@ import pytest
 
 import daily_runner as dr
 import data_downloader as dd
-from run_evidence import SafeFormatter, capture_download
+from run_evidence import EvidenceSession, SafeFormatter, capture_download
+from curl_cffi import requests, CurlInfo
 
 
 def frame():
@@ -158,3 +159,73 @@ def test_formatter_redacts_traceback_and_url_query():
         record = logging.LogRecord("x", logging.ERROR, "", 0, "https://example.test/?crumb=hidden", (), sys.exc_info())
     text = SafeFormatter("%(message)s").format(record)
     assert "hidden" not in text and "pretend-secret" not in text and "[REDACTED]" in text
+
+
+def test_chart_http_metadata_has_status_length_and_first_byte(monkeypatch, tmp_path):
+    response = SimpleNamespace(status_code=200, headers={"Content-Length": "12345", "Age": "12", "Set-Cookie": "pretend-secret"},
+                               infos={CurlInfo.STARTTRANSFER_TIME: 0.25})
+    monkeypatch.setattr(requests.Session, "request", lambda *a, **k: response)
+    with EvidenceSession() as session:
+        assert session.get("https://query1.finance.yahoo.com/v8/finance/chart/COMI.CA?crumb=pretend-secret",
+                           params={"range": "2y", "interval": "1d", "crumb": "pretend-secret"}) is response
+        capture_download(tmp_path / "run/downloads", "COMI.CA", 1, frame(), transport=session.chart_requests)
+    text = next(tmp_path.rglob("*.json")).read_text()
+    body = json.loads(text)
+    event = body["chart_http_requests"][0]
+    assert body["http_status"] == 200 and body["http_headers"] == {"Content-Length": 12345, "Age": 12}
+    assert event["first_byte_seconds"] == 0.25 and event["first_byte_at_utc"].endswith("+00:00")
+    assert event["query"] == {"range": "2y", "interval": "1d"}
+    assert event["first_byte_at_cairo"].endswith("+03:00")
+    assert "pretend-secret" not in text and "crumb" not in text and "Set-Cookie" not in text
+
+
+def test_chart_network_failure_preserves_error_type_only(monkeypatch):
+    def fail(*a, **k):
+        raise ConnectionError("Cookie: pretend-secret")
+    monkeypatch.setattr(requests.Session, "request", fail)
+    with EvidenceSession() as session:
+        with pytest.raises(ConnectionError):
+            session.get("https://query2.finance.yahoo.com/v8/finance/chart/COMI.CA")
+    event = session.chart_requests[0]
+    assert event["error_type"] == "ConnectionError" and event["http_status"] is None
+    assert "pretend-secret" not in json.dumps(event)
+
+
+def test_no_chart_request_is_not_claimed_as_cache(monkeypatch, tmp_path):
+    response = SimpleNamespace(status_code=200)
+    monkeypatch.setattr(requests.Session, "request", lambda *a, **k: response)
+    with EvidenceSession() as session:
+        assert session.get("https://query1.finance.yahoo.com/v1/test/getcrumb") is response
+        assert not session.chart_requests
+        capture_download(tmp_path / "run/downloads", "COMI.CA", 1, frame(), transport=session.chart_requests)
+    body = json.loads(next(tmp_path.rglob("*.json")).read_text())
+    assert body["transport_metadata"] == "no_chart_http_observed" and body["http_status"] is None
+
+
+def test_downloader_links_http_retries_to_returned_dataframe(monkeypatch, tmp_path):
+    responses = iter([SimpleNamespace(status_code=503, headers={}, infos={}),
+                      SimpleNamespace(status_code=200, headers={}, infos={})])
+    monkeypatch.setattr(requests.Session, "request", lambda *a, **k: next(responses))
+    def download(symbol, session, **kwargs):
+        for _ in range(2):
+            session.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}")
+        return frame()
+    monkeypatch.setattr(dd.yf, "download", download)
+    evidence = tmp_path / "run/downloads"
+    assert dd.download_ticker("COMI.CA", tmp_path / "data", evidence_dir=evidence).rows == 8
+    body = json.loads(next(evidence.glob("*.json")).read_text())
+    assert [e["http_status"] for e in body["chart_http_requests"]] == [503, 200]
+    assert body["raw_rows"] == 8 and body["http_status"] == 200
+
+
+def test_session_remains_usable_by_yfinance_after_download(monkeypatch, tmp_path):
+    sessions = []
+    def download(symbol, session, **kwargs):
+        sessions.append(session)
+        return frame()
+    monkeypatch.setattr(dd.yf, "download", download)
+    dd.download_ticker("COMI.CA", tmp_path / "data")
+    try:
+        assert not sessions[0]._closed
+    finally:
+        sessions[0].close()

@@ -14,7 +14,7 @@ import pandas as pd
 import yfinance as yf
 from egx_lists import UNIVERSE
 from data_health import require_daily_data
-from run_evidence import SafeFormatter, capture_download, new_run_id
+from run_evidence import EvidenceSession, SafeFormatter, capture_download, new_run_id
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -112,12 +112,14 @@ def download_ticker(
     evidence_dir = evidence_dir or folder / ".evidence" / new_run_id() / "downloads"
 
     def request(number, **kwargs):
+        # YfData retains this session for later Ticker calls; match yf.download's lifetime.
+        session = EvidenceSession()
         try:
-            raw = yf.download(symbol, **kwargs)
+            raw = yf.download(symbol, session=session, **kwargs)
         except Exception as exc:
-            capture_download(evidence_dir, symbol, number, None, exc)
+            capture_download(evidence_dir, symbol, number, None, exc, transport=session.chart_requests)
             raise
-        capture_download(evidence_dir, symbol, number, raw)
+        capture_download(evidence_dir, symbol, number, raw, transport=session.chart_requests)
         return raw
 
     raw = request(
