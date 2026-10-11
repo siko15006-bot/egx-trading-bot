@@ -49,9 +49,15 @@ def due(today: str, last: str | None, cal: list[str]) -> bool:
     return last is None or sum(last < d <= today for d in cal) >= EVERY
 
 
+def broken(close: pd.DataFrame) -> pd.Series:
+    """Tickers with a >25% one-session move inside the 252-session feature window (r252/range252): an unadjusted or
+    misdated corporate action. Same rule as evaluate(); scoring them would rank a data error (P1B-H3-SCORING-BREAKS)."""
+    return (close.ffill().pct_change(fill_method=None).abs() > eng.MAX_DAILY_MOVE).iloc[-252:].any()
+
+
 def score_pool(close: pd.DataFrame, value: pd.DataFrame, is_real: pd.DataFrame) -> pd.DataFrame:
-    """Frozen-model scores for the eligible pool on the last row of the panel."""
-    d = h3.dataset(close, value, is_real, positions=[len(close) - 1])
+    """Frozen-model scores for the eligible pool on the last row of the panel; broken tickers are not eligible."""
+    d = h3.dataset(close, value, is_real, positions=[len(close) - 1], exclude=broken(close))
     x = (d[MODEL["features"]].to_numpy() - np.array(MODEL["mean"])) / np.array(MODEL["scale"])
     d["score"] = 1 / (1 + np.exp(-(x @ np.array(MODEL["coef"]) + MODEL["intercept"])))
     d = d.reset_index().rename(columns={"index": "ticker"}).sort_values(["score", "ticker"], ascending=[False, True])
@@ -115,7 +121,9 @@ def main(force: bool = False) -> int:
     stats, kill = summary(evaluate(book, close.ffill()))
     top = picks[picks["top10"] == 1]
     lines = "\n".join(f"{int(r.rank)}. {r.ticker.replace('.CA', '')} ({r.score:.2f})" for r in top.itertuples())
-    send_telegram(f"{LABEL}\nإعادة ترتيب: {rebalance} — أعلى 10 من {len(picks)} سهم سيولة:\n{lines}\n\n{stats}")
+    out = sorted(t.replace(".CA", "") for t in broken(close)[lambda b: b].index)
+    excluded = f"\nمستبعد (قفزة داتا >25% في آخر 252 جلسة): {', '.join(out)}" if out else ""
+    send_telegram(f"{LABEL}\nإعادة ترتيب: {rebalance} — أعلى 10 من {len(picks)} سهم سيولة:\n{lines}{excluded}\n\n{stats}")
     print(f"rebalance {rebalance}: {len(picks)} scored, kill={kill}")
     return 0
 
@@ -130,6 +138,16 @@ def _selftest() -> None:
     ev = evaluate(book, closes).iloc[0]   # C jumps +200% (data break) → excluded from both averages
     assert abs(ev["ideal_top10"] - (0.2 - FEE)) < 1e-12 and abs(ev["ideal_ew"] - 0.05) < 1e-12
     assert abs(ev["real_top10"] - (12 / 11 - 1 - FEE)) < 1e-12 and abs(ev["real_ew"] - ((12 / 11 - 1) + (9 / 10 - 1)) / 2) < 1e-12
+    # P1B-H3-SCORING-BREAKS: a ticker with a >25% jump in the feature window never enters the pool
+    days = pd.date_range("2025-01-01", periods=200)
+    panel = pd.DataFrame({f"T{k:02d}": 100.0 + k for k in range(12)}, index=days)
+    panel.iloc[150:, 0] /= 2   # T00: false -50% (partial split back-adjust)
+    value = panel * 1000.0
+    value["T00"] *= 100        # most liquid: would be in any pool
+    b = broken(panel)
+    assert list(b[b].index) == ["T00"]
+    assert "T00" not in h3.pools(panel, value, panel.notna(), positions=[199], exclude=b)[199]
+    assert "T00" in h3.pools(panel, value, panel.notna(), positions=[199])[199]   # research default unchanged
     text, kill = summary(pd.DataFrame([{"real_top10": -0.2, "real_ew": 0.0}]))
     assert kill and "⛔" in text
     print("h3_forward self-test OK")

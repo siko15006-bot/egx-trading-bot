@@ -77,12 +77,26 @@ Found 2026-10-06 on COMI, checked against Yahoo directly.
 
 | Folder | Download | Meaning | Used by |
 |---|---|---|---|
-| `data/` | `data_downloader.py`: `auto_adjust=False, actions=False` | split-adjusted, **dividend-unadjusted** | production: daily_runner, signal_engine, dashboard |
+| `data/` | `data_downloader.py`: `auto_adjust=False, actions=True` + split fix (2026-10-11) | split-adjusted, **dividend-unadjusted** | production: daily_runner, signal_engine, dashboard |
 | `data_2019_2026_wf/` | script not in repo; matches Yahoo `auto_adjust=True` | fully adjusted (splits + dividends) | analysis only: decision_analysis / decision_report |
-| `data_dividend_adjusted/` | `fetch_adjusted.py`: `auto_adjust=True, actions=True`, 2y, yfinance 1.2.0 | fully adjusted + `Dividends`/`Stock Splits` columns; companion to `data/`, **not a replacement** | returns/PnL (from 2026-10-06) |
+| `data_dividend_adjusted/` | `fetch_adjusted.py`: `auto_adjust=False, actions=True` + split fix, then OHLC × Adj Close / Close (yfinance's own rule), 2y, yfinance 1.2.0 | fully adjusted + `Dividends`/`Stock Splits` columns; companion to `data/`, **not a replacement** | returns/PnL (from 2026-10-06) |
+| `data_h3_live/` | `research_h1_momentum.download` (via `h3_forward`): same as the row above, from 2019 | fully adjusted | H3 forward test |
 
 - COMI ex-dividend 2026-04-07 (EGP 6.00): before it `data/` = 1.049 × `wf` (127.76 / 121.76), after it equal.
 - `auto_adjust=False` is not "as traded": Yahoo still back-adjusts splits (COMI: 2021-08, 2022-09, 2025-12).
+- **Bonus shares since 2024 are only partly back-adjusted by Yahoo** (audit `egx_reports/FALSE_DROPS_AUDIT_2026-10-11.md`):
+  the split is dated on the ex-date but only the ~4-8 sessions before it are divided, so the series shows a false drop
+  days early (COMI 2025-12-08 −7.8%, SKPC 2026-01-04 −20.2%, HDBK 2026-06-29 −49.6%) and older history on the old
+  basis. 2019-2023 events are fully adjusted. Every download now runs `data_downloader.apply_backadjust_fix`:
+  Yahoo's raw response is archived to `backups/yahoo_raw/` and logged in `logs/backadjust_fixes.jsonl`; the false drop
+  is found by the tick grid (Yahoo's divided closes are off the 0.001 EGP grid) or, for factors ≥ 7% only, by the
+  drop closest to the factor; everything before it is divided by the factor. A drop still factor-sized afterwards and
+  not confirmed by the grid rejects that ticker's download (old file kept). Factors < 7% without a grid signal are
+  left alone unless listed in `MANUAL_FALSE_DROPS` (empty). **MASR 2026-03-04 is UNKNOWN**: treasury-share
+  distribution 0.0417/share, AGM 2026-02-15, right to the close of 2026-03-03 (almalnews, Mubasher via search,
+  2026-10-11), so Yahoo's ex-date and factor are right; but where Yahoo's divided block starts (2026-02-22 −3.6% or
+  2026-02-25 −4.8%) needs independent closes for 02-19..03-03 — until then `data/` before it is ~4% high. Not covered: corporate actions Yahoo does not
+  record as a split (MFPC 2024-01-02 merger shares) — `data_breaks` still cancels those.
 - Rules: execution levels (Entry/SL/TP) from `data/`; returns/PnL from fully adjusted prices (or `data/` + dividends);
   never combine both folders in one calculation; any new download must state `auto_adjust`/`actions` here.
 - Verified 2026-10-06 on all 90 stocks: `data/` / adjusted Close ratio steps **only** on ex-dividend dates from
@@ -257,6 +271,25 @@ price accuracy. Close/Adj Close adjustment policies and causes are unverified.
 These cases must not support acceptance before independent external-source
 verification. No data correction or new strategy run is authorized here.
 Evidence and resolution requirements: docs/data_quality_findings.md.
+
+### P1B-DATA-AMES-20260419: unrecorded split in AMES (OPEN, low impact)
+
+AMES.CA drops -48.7% on 2026-04-19 (53.00 -> 27.1696). The new close is off the
+0.001 EGP tick grid, i.e. a price Yahoo divided, but neither Yahoo's Stock Splits
+nor docs/corporate_actions.csv has an event for it, so the split fix cannot see
+it (seen in the 2026-10-11 dry-run download with the fix). data_breaks cancels
+any trade across it (>25%), so no trade is affected; indicators around it are
+not reliable. Needs the corporate action from an external source, then a
+corporate_actions.csv row (or MANUAL_FALSE_DROPS entry).
+
+### P1B-DATA-HEALTH-STRICTNESS: one stale ticker blocks the whole daily run (OPEN, review)
+
+assess_daily_data marks the run DATA_UNAVAILABLE if any expected ticker is not
+fresh, and daily_runner raises before scan_universe. A split-fix guard rejection
+keeps the previous (stale) CSV, so one rejected ticker stops the daily report
+for every ticker until resolved (test_rejected_ticker_blocks_the_daily_scan).
+Safe (no signal on suspect data) but strict. Open question for Ahmed: allow a
+partial run that excludes rejected tickers with a warning, or keep refusing.
 
 ### Local development walk-forward scope (2026-10-09)
 

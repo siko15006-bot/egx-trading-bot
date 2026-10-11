@@ -120,3 +120,15 @@ Under that standard the Sharpe gap is 0.21 < 0.30, so: **Level 1 = PENDING, Leve
 - 2026-10-07 (before any completed period): realistic leg changed from next Open to next close (Yahoo's EGX Open is not a real
   opening price, KNOWN_ISSUES.md), and stocks with a >25% data break inside a period are left out of both averages.
   Model, features, universe and schedule unchanged, so the 12-period count is not restarted.
+- 2026-10-11 (before any completed period), **P1B-H3-SCORING-BREAKS** (Ahmed): the scoring used prices with Yahoo's false
+  bonus-share drops (HDBK −49.6% on 2026-06-29 sat in r252/range252 and kept it out of the 2026-10-05 top 10), while only
+  the evaluation dropped >25% breaks. Now (1) `data_h3_live/` is downloaded with the split fix (KNOWN_ISSUES.md), and
+  (2) a stock with a >25% one-session move in the last 252 sessions is not eligible for the pool (same rule as the
+  evaluation; the top 60 by liquidity is taken after excluding it; excluded names are listed in the Telegram message).
+  Re-scoring the 2026-10-05 rebalance on the fixed data gives HDBK in, MASR out (`outputs/backadjust_fix_20261011/`,
+  original DB rows in `backups/pre_backadjust_fix_20261011/egx_signals.db`). Rows published before 2026-10-11 stay as
+  they are (Ahmed 2026-10-11): `h3_forward` is the executed record and the evaluation runs on it. The re-score is
+  recorded alongside, never in its place, in table `h3_forward_rescored` (label `rescored_with_fixed_data`, with the
+  date it was recorded; also `outputs/backadjust_fix_20261011/h3_rescore_20261005.csv`). The fixed data and the
+  exclusion rule apply from the next rebalance (2026-11-03), not retroactively.
+  Model and features unchanged; no period had completed, so the count is not restarted.
