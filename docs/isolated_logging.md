@@ -47,6 +47,14 @@ own temporary DB/data paths. Evidence retention/rotation is not implemented in t
 
 A captured 200 confirms an observed HTTP response; it does not prove fresh market
 data or identify Yahoo/CDN caching. Age, when present, is only supporting evidence.
+Age estimates time since origin generation/validation across caches and transit; it
+does not identify a CDN specifically, prove local SDK caching, or establish stale
+market rows. TTFB includes connection/network/server time, not the lag in publishing
+a trading session. Content-Length counts representation bytes, not rows; a smaller
+value alone does not prove missing data, and encoding/request differences matter.
+References: [HTTP Age](https://www.rfc-editor.org/rfc/rfc9111.html#section-5.1),
+[Content-Length](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6),
+[libcurl TTFB](https://curl.se/libcurl/c/CURLINFO_STARTTRANSFER_TIME.html).
 No chart event is explicitly marked `no_chart_http_observed`, NOT automatically
 classified as a cache hit. An exception or rejected download can still keep the
 previous local CSV by the existing guard policy. Historical incidents with no saved
@@ -82,6 +90,11 @@ not production readiness or the cause of October 5-7 incidents. No deployment pe
   deadline AND completed/stored report AND confirmed report delivery.
   Correctly detecting stale data satisfies monitoring, not readiness.
 
+Five sessions are not five calendar days. October 14-18 contains only three regular
+Sunday-Thursday dates (14, 15, 18); 16-17 are Friday/Saturday. If deployment and the
+first verified session are October 14, the earliest five-session sequence is
+14, 15, 18, 19, 20, subject to the approved calendar and actual successful evidence.
+
 Milestones D2/D7/D14/D21 start only after deployment and verified evidence capture.
 D2: capture/isolation proven; D7: first evidence review; D14: pattern review;
 D21: explicit operational decision, not automatic acceptance or strategy deployment.
@@ -94,3 +107,8 @@ No automatic deployment is configured. If verified deployment happens October 14
 the 21-day maximum decision deadline is November 4; any later start shifts milestones.
 A rebalance before that decision is not automatically authorized by publishing a fix;
 source-readiness evidence and a separate operational decision remain necessary.
+If a separately authorized rebalance precedes a later decision that the live path
+is not ready, keep that rebalance under review with its original as-of data/evidence.
+Do not treat its completion as readiness, erase/reprice its historical record, or
+retroactively declare it accepted. The suspension applies from the recorded decision;
+any retrospective audit remains distinct. The November 3-4 date alone grants no execution.
