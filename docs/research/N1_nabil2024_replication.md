@@ -110,3 +110,5 @@ Final report = replication verdict + proxy verdict per strategy. Prior related r
 - 2026-10-11 (still before any download): removed the contradictory clause "not traded twice across halves" (every
   half starts OUT, so a position cannot stay IN through the boundary); benchmark buy timing fixed to the first
   session's close. Found while writing the engine.
+- 2026-10-11 (after the first run, verdict unchanged): added info-only diagnostics to the output (average exposure of
+  A, calendar-year returns) to explain the result; they are not part of any verdict rule.

@@ -1,0 +1,60 @@
+panel: 401 tickers, 2009-01-05 -> 2026-10-11; IS 2010-01-01..2020-12-31, OOS 2021-01-01..2026-06-30; base cost 0.30%/side, next-close execution
+
+=== Strategy A vs EW benchmark (same proxy universe, same costs)
+IS  EGP  A    total   +11.7% CAGR  +1.0% DD -34.3% Sharpe  0.15 | EW total   -20.7% CAGR  -2.1% DD -63.9% Sharpe  0.06
+IS  USD  A    total   -61.3% CAGR  -8.3% DD -72.4% Sharpe -0.29 | EW total   -72.5% CAGR -11.1% DD -86.0% Sharpe -0.22
+IS       trades 822 win 27.1% PF 1.06 | cost drag 1.47%/yr (EW 1.21%/yr, 660 trades)
+OOS EGP  A    total   +81.2% CAGR +11.4% DD -25.8% Sharpe  0.81 | EW total  +268.0% CAGR +26.7% DD -47.6% Sharpe  1.09
+OOS USD  A    total   -42.2% CAGR  -9.5% DD -59.8% Sharpe -0.27 | EW total   +17.5% CAGR  +3.0% DD -62.9% Sharpe  0.27
+OOS      trades 478 win 32.6% PF 1.77 | cost drag 1.72%/yr (EW 1.29%/yr, 330 trades)
+paired t (semi-annual, IS+OOS, n=33): mean A +3.01% vs EW +6.06%, t -1.45, one-sided p 0.921
+2026-H2 to date (not judged): A +12.6% vs EW +14.8%
+
+=== Strategy B-WF vs EW benchmark (same proxy universe, same costs)
+IS  EGP  B-WF total   +18.8% CAGR  +1.6% DD -30.2% Sharpe  0.20 | EW total   -20.7% CAGR  -2.1% DD -63.9% Sharpe  0.06
+IS  USD  B-WF total   -58.9% CAGR  -7.8% DD -69.9% Sharpe -0.29 | EW total   -72.5% CAGR -11.1% DD -86.0% Sharpe -0.22
+IS       trades 1384 win 36.4% PF 1.12 | cost drag 2.55%/yr (EW 1.21%/yr, 660 trades)
+OOS EGP  B-WF total   +88.9% CAGR +12.3% DD -25.9% Sharpe  0.90 | EW total  +268.0% CAGR +26.7% DD -47.6% Sharpe  1.09
+OOS USD  B-WF total   -39.7% CAGR  -8.8% DD -64.9% Sharpe -0.25 | EW total   +17.5% CAGR  +3.0% DD -62.9% Sharpe  0.27
+OOS      trades 761 win 37.6% PF 1.76 | cost drag 2.73%/yr (EW 1.29%/yr, 330 trades)
+paired t (semi-annual, IS+OOS, n=33): mean B-WF +3.06% vs EW +6.06%, t -1.19, one-sided p 0.878
+2026-H2 to date (not judged): B-WF +7.0% vs EW +14.8%
+N chosen per interval: 100 100 100 100 20 20 20 20 20 20 150 150 200 20 20 20 20 200 100 100 200 20 200 20 20 100 20 20 100 20 200 200 200 200
+
+-- B per fixed N (info only, never used to choose) --
+B N= 20 IS  EGP total   +24.4% CAGR  +2.0% DD -35.8% Sharpe  0.23 | EW CAGR  -2.1%
+B N= 20 OOS EGP total   +78.8% CAGR +11.2% DD -22.6% Sharpe  0.90 | EW CAGR +26.7%
+B N= 50 IS  EGP total   -10.9% CAGR  -1.0% DD -36.9% Sharpe -0.02 | EW CAGR  -2.1%
+B N= 50 OOS EGP total   +58.4% CAGR  +8.7% DD -27.9% Sharpe  0.69 | EW CAGR +26.7%
+B N=100 IS  EGP total   +11.5% CAGR  +1.0% DD -30.3% Sharpe  0.15 | EW CAGR  -2.1%
+B N=100 OOS EGP total   +80.9% CAGR +11.4% DD -22.3% Sharpe  0.86 | EW CAGR +26.7%
+B N=150 IS  EGP total    +9.9% CAGR  +0.9% DD -31.9% Sharpe  0.14 | EW CAGR  -2.1%
+B N=150 OOS EGP total   +62.8% CAGR  +9.3% DD -26.6% Sharpe  0.72 | EW CAGR +26.7%
+B N=200 IS  EGP total    +6.9% CAGR  +0.6% DD -32.5% Sharpe  0.11 | EW CAGR  -2.1%
+B N=200 OOS EGP total  +102.2% CAGR +13.7% DD -27.1% Sharpe  0.97 | EW CAGR +26.7%
+
+-- sensitivity (OOS, EGP; strategy minus its own EW benchmark) --
+A    cost 0             OOS CAGR +13.3% vs EW +28.3% (diff -15.0%) Sharpe 0.92 vs 1.14 | IS CAGR  +2.5% vs  -0.9%
+A    cost 0.15%         OOS CAGR +12.4% vs EW +27.5% (diff -15.2%) Sharpe 0.86 vs 1.12 | IS CAGR  +1.8% vs  -1.5%
+A    cost 0.50%         OOS CAGR +10.2% vs EW +25.7% (diff -15.5%) Sharpe 0.73 vs 1.06 | IS CAGR  +0.0% vs  -2.9%
+A    same-close exec    OOS CAGR +15.0% vs EW +26.7% (diff -11.8%) Sharpe 0.98 vs 1.09 | IS CAGR  +3.2% vs  -2.1%
+A    mixed M2           OOS CAGR  +6.9% vs EW +26.7% (diff -19.8%) Sharpe 0.65 vs 1.09 | IS CAGR  +2.1% vs  -2.1%
+A    index top60        OOS CAGR +11.4% vs EW +26.7% (diff -15.4%) Sharpe 0.81 vs 1.09 | IS CAGR  +1.4% vs  -2.1%
+A    3-month intervals  OOS CAGR +10.2% vs EW +22.8% (diff -12.6%) Sharpe 0.74 vs 0.97 | IS CAGR  +1.6% vs  -2.7%
+B-WF cost 0             OOS CAGR +18.8% vs EW +28.3% (diff  -9.5%) Sharpe 1.32 vs 1.14 | IS CAGR  +4.3% vs  -0.9%
+B-WF cost 0.15%         OOS CAGR +15.1% vs EW +27.5% (diff -12.5%) Sharpe 1.09 vs 1.12 | IS CAGR  +2.8% vs  -1.5%
+B-WF cost 0.50%         OOS CAGR +10.2% vs EW +25.7% (diff -15.4%) Sharpe 0.77 vs 1.06 | IS CAGR  +0.3% vs  -2.9%
+B-WF same-close exec    OOS CAGR +16.0% vs EW +26.7% (diff -10.7%) Sharpe 1.21 vs 1.09 | IS CAGR  +6.6% vs  -2.1%
+B-WF mixed M2           OOS CAGR  +4.9% vs EW +26.7% (diff -21.9%) Sharpe 0.50 vs 1.09 | IS CAGR  -1.4% vs  -2.1%
+B-WF index top60        OOS CAGR  +9.1% vs EW +26.7% (diff -17.6%) Sharpe 0.72 vs 1.09 | IS CAGR  +2.0% vs  -2.1%
+B-WF 3-month intervals  OOS CAGR +12.0% vs EW +22.8% (diff -10.8%) Sharpe 0.90 vs 0.97 | IS CAGR  +2.0% vs  -2.7%
+
+-- diagnostics (info only, not part of the verdict) --
+A average exposure IS: 48% of the 30 slots (rest in cash at 0%)
+A average exposure OOS: 52% of the 30 slots (rest in cash at 0%)
+calendar-year EGP returns, A / EW: 2011: -25%/-50%  2012: +16%/+44%  2013: +19%/+6%  2014: +12%/+18%  2015: -21%/-37%  2016: +21%/+37%  2017: +16%/+28%  2018: -10%/-14%  2019: -6%/-7%  2020: -1%/-2%  2021: -6%/-14%  2022: +22%/+16%  2023: +27%/+58%  2024: +4%/+22%  2025: +7%/+52%  2026: +25%/+46%
+
+== VERDICT (pre-registered rules) ==
+Faithful replication: INSUFFICIENT_DATA (no EGX30 index history, no point-in-time constituents)
+Proxy A: REJECT  (OOS CAGR +11.4% vs EW +26.7%; p 0.921; variants beating EW OOS 0%)
+Proxy B-WF: REJECT  (OOS CAGR +12.3% vs EW +26.7%; p 0.878; variants beating EW OOS 0%)

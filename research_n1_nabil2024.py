@@ -123,13 +123,14 @@ class Result:
     value: pd.Series          # portfolio value at each close (starts at 1)
     halves: pd.DataFrame      # per interval: start, end, ret, cost (fraction of the interval's starting value), n
     trades: pd.DataFrame      # round trips: ticker, start (entry date), entry, exit, ret (net of both sides)
+    exposure: pd.Series | None = None  # share of the interval's slots IN at each close (info only)
 
 
 def run(close: pd.DataFrame, value: pd.DataFrame, real: pd.DataFrame, cfg: Cfg) -> Result:
     px = close.ffill()
     ret = px.pct_change(fill_method=None).fillna(0.0)
     hist = max(GRID) + 5
-    v_total, out_v, out_d, halves, trades = 1.0, [], [], [], []
+    v_total, out_v, out_d, out_x, halves, trades = 1.0, [], [], [], [], []
     for anchor, end in periods(close.index, cfg.months):
         if anchor < RANK_WINDOW or close.index[end] < pd.Timestamp(IS[0]):
             continue
@@ -163,13 +164,15 @@ def run(close: pd.DataFrame, value: pd.DataFrame, real: pd.DataFrame, cfg: Cfg) 
                 trades.append((names[i], entry_d[i], entry[i], slot[i]))
             held = np.where(change, target, held)
             out_v.append(slot.sum())
+            out_x.append(held.mean())
             out_d.append(close.index[d])
         v_total = slot.sum()
         halves.append((close.index[anchor + 1], close.index[end], v_total / start_v - 1, cost / start_v, cfg.n))
     t = pd.DataFrame(trades, columns=["ticker", "start", "entry", "exit"])
     t["ret"] = t["exit"] / t["entry"] - 1
     return Result(pd.Series(out_v, index=pd.DatetimeIndex(out_d)),
-                  pd.DataFrame(halves, columns=["start", "end", "ret", "cost", "n"]), t)
+                  pd.DataFrame(halves, columns=["start", "end", "ret", "cost", "n"]), t,
+                  pd.Series(out_x, index=pd.DatetimeIndex(out_d)))
 
 
 def walk_forward_b(close, value, real, base: Cfg) -> Result:
@@ -303,6 +306,13 @@ def main() -> int:
                          f"IS CAGR {is_s['cagr']:+6.1%} vs {is_b['cagr']:+6.1%}")
         verdict[name]["robust"] = wins / len(variants)
 
+    lines.append("\n-- diagnostics (info only, not part of the verdict) --")
+    ra, re_ = base["A"]["strat"], base["A"]["bench"]
+    for tag, (lo, hi) in {"IS": IS, "OOS": OOS}.items():
+        lines.append(f"A average exposure {tag}: {ra.exposure.loc[lo:hi].mean():.0%} of the 30 slots (rest in cash at 0%)")
+    yr = lambda v: (v.groupby(v.index.year).last() / v.groupby(v.index.year).last().shift(1) - 1).dropna()
+    ya, ye = yr(ra.value), yr(re_.value)
+    lines.append("calendar-year EGP returns, A / EW: " + "  ".join(f"{y}: {ya[y]:+.0%}/{ye[y]:+.0%}" for y in ya.index))
     lines.append("\n== VERDICT (pre-registered rules) ==")
     lines.append("Faithful replication: INSUFFICIENT_DATA (no EGX30 index history, no point-in-time constituents)")
     for name, v in verdict.items():
