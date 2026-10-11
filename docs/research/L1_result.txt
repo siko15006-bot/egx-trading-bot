@@ -1,0 +1,21 @@
+panel: 401 tickers, 2009-01-04 -> 2026-10-11; base {'window': 252, 'top_n': 10, 'top_liq': 60, 'fee': 0.003, 'lag': 0}
+IS  EGP L1 total   +75.5% CAGR  +5.7% DD -53.6% Sharpe  0.38 | EW total   +70.3% CAGR  +5.4% DD -60.9% Sharpe  0.33
+IS  USD L1 total   -39.6% CAGR  -4.9% DD -68.0% Sharpe -0.05 | EW total   -41.4% CAGR  -5.2% DD -76.9% Sharpe  0.00
+IS      21-session periods: win 53.3% PF 1.32 | trades (names in/out) 430 | cost drag 1.57%/yr
+OOS EGP L1 total  +499.2% CAGR +41.9% DD -26.3% Sharpe  1.75 | EW total  +404.8% CAGR +37.2% DD -44.3% Sharpe  1.39
+OOS USD L1 total   +91.4% CAGR +13.5% DD -48.9% Sharpe  0.60 | EW total   +61.3% CAGR  +9.8% DD -56.4% Sharpe  0.47
+OOS     21-session periods: win 68.3% PF 3.08 | trades (names in/out) 212 | cost drag 2.04%/yr
+2026-07 to date (not judged): L1 +10.4% vs EW +12.3%
+
+-- sensitivity (OOS, EGP) --
+window 63    L1 Sharpe  1.90 CAGR +49.0% DD -26.6% | EW Sharpe  1.39 CAGR +37.2% DD -44.3%
+window 126   L1 Sharpe  1.73 CAGR +41.5% DD -28.2% | EW Sharpe  1.39 CAGR +37.2% DD -44.3%
+hold 5       L1 Sharpe  1.83 CAGR +48.7% DD -29.6% | EW Sharpe  1.39 CAGR +37.2% DD -44.3%
+hold 15      L1 Sharpe  1.87 CAGR +45.7% DD -25.4% | EW Sharpe  1.39 CAGR +37.2% DD -44.3%
+pool top30   L1 Sharpe  1.64 CAGR +43.4% DD -27.4% | EW Sharpe  0.97 CAGR +25.0% DD -50.5%
+pool top100  L1 Sharpe  2.34 CAGR +53.5% DD -24.9% | EW Sharpe  1.74 CAGR +46.6% DD -39.8%
+cost 0.15%   L1 Sharpe  1.78 CAGR +42.9% DD -26.1% | EW Sharpe  1.40 CAGR +37.9% DD -44.1%
+cost 0.50%   L1 Sharpe  1.71 CAGR +40.6% DD -26.4% | EW Sharpe  1.36 CAGR +36.4% DD -44.7%
+signal lag 1 L1 Sharpe  1.70 CAGR +40.6% DD -26.3% | EW Sharpe  1.39 CAGR +37.2% DD -44.3%
+
+== VERDICT (pre-registered) == L1: WEAK  (OOS Sharpe EGP 1.75 vs 1.39, USD 0.60 vs 0.47; IS EGP 0.38 vs 0.33, USD -0.05 vs 0.00; variants above EW 100%)
