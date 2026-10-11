@@ -126,8 +126,9 @@ Under that standard the Sharpe gap is 0.21 < 0.30, so: **Level 1 = PENDING, Leve
   (2) a stock with a >25% one-session move in the last 252 sessions is not eligible for the pool (same rule as the
   evaluation; the top 60 by liquidity is taken after excluding it; excluded names are listed in the Telegram message).
   Re-scoring the 2026-10-05 rebalance on the fixed data gives HDBK in, MASR out (`outputs/backadjust_fix_20261011/`,
-  original DB rows in `backups/pre_backadjust_fix_20261011/egx_signals.db`). The published 2026-10-05 rows are NOT
-  replaced (Ahmed 2026-10-11): `h3_forward` keeps what was actually published and the evaluation runs on it; the
-  re-score stays alongside as an amended, informational record (`outputs/backadjust_fix_20261011/h3_rescore_20261005.csv`).
-  The exclusion rule applies from the next rebalance on, not retroactively.
+  original DB rows in `backups/pre_backadjust_fix_20261011/egx_signals.db`). Rows published before 2026-10-11 stay as
+  they are (Ahmed 2026-10-11): `h3_forward` is the executed record and the evaluation runs on it. The re-score is
+  recorded alongside, never in its place, in table `h3_forward_rescored` (label `rescored_with_fixed_data`, with the
+  date it was recorded; also `outputs/backadjust_fix_20261011/h3_rescore_20261005.csv`). The fixed data and the
+  exclusion rule apply from the next rebalance (2026-11-03), not retroactively.
   Model and features unchanged; no period had completed, so the count is not restarted.

@@ -20,6 +20,20 @@ FX = HERE / "data_2019_2026_wf" / "fx" / "EGP_USD.csv"
 EXTRA = ["TALM.CA", "KZPC.CA"]
 FEE_PER_SIDE = 0.003 / 2  # RiskConfig.round_trip_fee_pct, charged per unit traded on each side
 SPLIT = "2023-01-01"
+MAX_REJECTED = 0.05  # more files kept than this = a broken Yahoo response: fail, so no rebalance is scored on it
+
+
+def _refuse(path: Path, frame: pd.DataFrame) -> str | None:
+    """Why a downloaded frame must not replace the cached CSV, else None. During the 2026-10-11 session Yahoo returned
+    one intraday bar (Close below Low) for 233 of 403 tickers; writing it would replace 7 years of history."""
+    if not path.exists():
+        return None
+    old = pd.read_csv(path, usecols=["Date"])["Date"].astype(str).str[:10]
+    if len(frame) < 0.5 * len(old):
+        return f"{len(frame)} rows < half of the cached {len(old)}"
+    if frame.index[-1] < old.iloc[-1]:
+        return f"last date {frame.index[-1]} < cached {old.iloc[-1]}"
+    return None
 
 
 def download() -> None:
@@ -35,6 +49,8 @@ def download() -> None:
     for t in tickers:
         frame = raw[t].dropna(how="all", subset=["Close"]) if t in raw.columns.get_level_values(0) else pd.DataFrame()
         if not len(frame):
+            if (OUT / f"{t}.csv").exists():
+                failed.append(f"{t}: empty Yahoo response, cached file kept")
             continue
         try:
             frame = to_adjusted(apply_backadjust_fix(frame, t, OUT.name))  # fully adjusted, as before
@@ -43,11 +59,17 @@ def download() -> None:
             continue
         frame.index = pd.to_datetime(frame.index).strftime("%Y-%m-%d")
         frame.index.name = "Date"
+        reason = _refuse(OUT / f"{t}.csv", frame)
+        if reason:
+            failed.append(f"{t}: refusing overwrite: {reason}")
+            continue
         frame[["Open", "High", "Low", "Close", "Volume"]].to_csv(OUT / f"{t}.csv")
         saved += 1
     print(f"requested {len(tickers)}, saved {saved}, yfinance {yf.__version__}")
     for line in failed:
-        print("NOT SAVED (back-adjust guard):", line)
+        print("NOT SAVED:", line)
+    if len(failed) > MAX_REJECTED * len(tickers):
+        raise RuntimeError(f"{len(failed)}/{len(tickers)} tickers not saved: Yahoo response looks broken")
 
 
 def load_panels(folder: Path = OUT) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:

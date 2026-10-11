@@ -93,6 +93,7 @@ def test_download_ticker_saves_fixed_prices_and_archives_raw(tmp_path, monkeypat
     assert len(raw_files) == 1 and pd.read_csv(raw_files[0])["Close"].iloc[0] == 100.0  # Yahoo's response as received
     log = [json.loads(line) for line in (tmp_path / "fix.jsonl").read_text(encoding="utf-8").splitlines()]
     assert log[0]["ticker"] == "SKPC.CA" and log[0]["false_drop"] and log[0]["raw"] == str(raw_files[0])
+    assert log[0]["fix_type"] == "inferred" and log[0]["verified_by"] is None  # price-only, no external source
 
 
 def test_guard_failure_keeps_the_old_file(tmp_path, monkeypatch):

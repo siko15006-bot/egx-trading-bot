@@ -36,6 +36,22 @@ RAW_ARCHIVE = BASE_DIR / "backups" / "yahoo_raw"
 # MASR 2026-03-04 (x1.0417) stays UNKNOWN: event and ex-date confirmed, Yahoo's divided block start is not (KNOWN_ISSUES).
 MANUAL_FALSE_DROPS: dict[tuple[str, str], str] = {}
 TRUSTED = ("fingerprint", "none: window already on the new basis (fully adjusted)")  # tick-grid verdicts
+# Fix log flags (Ahmed 2026-10-11): fix_type "verified" = the false-drop day is Yahoo's own divided block (tick grid);
+# "inferred" = price-only. verified_by = an external source for the corporate action itself (not for the day).
+EVIDENCE = {"fingerprint": "tick-grid: start of the block of closes Yahoo divided",
+            "price-only": "single factor-sized drop in the 10 sessions before Yahoo's split date; guard rejects two",
+            "manual (approved)": "MANUAL_FALSE_DROPS entry, day still drops by about the factor"}
+EXTERNAL_SOURCES = {  # (ticker, Yahoo split date) -> source; from build_fixed.py EVENT_INFO and Ahmed's checks
+    ("EAST.CA", "2024-06-06"): "reference price 2024-06-06 (arabfinance/almalnews)",
+    ("SKPC.CA", "2024-10-10"): "bonus 1:5, AGM approval (ahram/cnbcarabia)",
+    ("EFIH.CA", "2025-06-02"): "bonus 0.5:1, reference price 2025-06-02 (arabfinance)",
+    ("ADIB.CA", "2025-06-10"): "bonus 1:1, entitlement to 2025-06-04 (bankygate)",
+    ("MFPC.CA", "2025-07-23"): "EGM 2025-04-12, capital 20.79bn -> 28.68bn (arabfinance/hapijournal)",
+    ("COMI.CA", "2025-12-17"): "CIB RNS 2025-12-03: 1 per 10, holders to 2025-12-16 (investegate)",
+    ("SKPC.CA", "2026-01-12"): "0.25 bonus/share, entitlement to 2026-01-11 (arabfinance)",
+    ("EXPA.CA", "2026-10-07"): "0.3235294117 bonus/share, last right 2026-10-06 (Arab Finance, Sigma, Mubasher)",
+    ("ORHD.CA", "2026-10-07"): "2.2288508184 bonus/share, last right 2026-10-06 (Arab Finance, Sigma, Mubasher)",
+}
 FIX_LOG = BASE_DIR / "logs" / "backadjust_fixes.jsonl"
 
 
@@ -204,6 +220,10 @@ def apply_backadjust_fix(raw: pd.DataFrame, ticker: str, source: str) -> pd.Data
         FIX_LOG.parent.mkdir(parents=True, exist_ok=True)
         with FIX_LOG.open("a", encoding="utf-8") as log:
             for note in notes:
+                if note.get("false_drop"):
+                    note = note | dict(fix_type="verified" if note["method"] == "fingerprint" else "inferred",
+                                       evidence=EVIDENCE[note["method"]],
+                                       verified_by=EXTERNAL_SOURCES.get((ticker, note["split_date"])))
                 log.write(json.dumps(dict(at=now.isoformat(timespec="seconds"), source=source, ticker=ticker,
                                           raw=str(path), raw_sha256=digest, **note), ensure_ascii=False) + "\n")
         LOGGER.info("%s back-adjust: %s", ticker, notes)
